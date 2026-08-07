@@ -9,7 +9,7 @@
 CrossPoint.registerPlugin(async (container, api) => {
   const CONFIG_PATH = '/.crosspoint/plugin-store.json';
   const PLUGINS_DIR = '/.crosspoint/plugins';
-  const DEFAULT_CATALOG = 'https://raw.githubusercontent.com/crosspoint-reader/sd-plugins/main/catalog.json';
+  const DEFAULT_CATALOG = 'https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json';
 
   let catalogs = [];  // list of catalog URLs
 

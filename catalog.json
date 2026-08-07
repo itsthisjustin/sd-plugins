@@ -2,11 +2,69 @@
   "name": "CrossPoint Plugins",
   "plugins": [
     {
+      "name": "bookfusion",
+      "title": "BookFusion",
+      "description": "Browse and download your BookFusion library on the device.",
+      "author": "CrossPoint",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/bookfusion/",
+      "files": [
+        "manifest.json",
+        "device.json",
+        "plugin.js",
+        "README.md"
+      ]
+    },
+    {
+      "name": "hello",
+      "title": "Hello Plugin",
+      "description": "Minimal example plugin.",
+      "author": "CrossPoint",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/hello/",
+      "files": [
+        "manifest.json",
+        "plugin.js"
+      ]
+    },
+    {
+      "name": "organize-by-author",
+      "title": "Sort EPUBs by Author",
+      "description": "Sort EPUBs in a folder into per-author subfolders.",
+      "author": "CrossPoint",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/organize-by-author/",
+      "files": [
+        "manifest.json",
+        "plugin.js"
+      ]
+    },
+    {
+      "name": "plugin-store",
+      "title": "Plugin Store",
+      "description": "Browse and install CrossPoint plugins from a hosted catalog.",
+      "author": "CrossPoint",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/plugin-store/",
+      "files": [
+        "manifest.json",
+        "plugin.js",
+        "README.md"
+      ]
+    },
+    {
+      "name": "protected-content",
+      "title": "Protected Content",
+      "description": "Fulfill protected content from an online provider.",
+      "author": "CrossPoint",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/protected-content/",
+      "files": [
+        "manifest.json",
+        "plugin.js"
+      ]
+    },
+    {
       "name": "wallabag",
       "title": "Wallabag",
       "description": "Read your Wallabag saved articles on the device as EPUB.",
       "author": "CrossPoint",
-      "base": "https://raw.githubusercontent.com/crosspoint-reader/sd-plugins/main/wallabag/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/wallabag/",
       "files": [
         "manifest.json",
         "device.json",
@@ -17,49 +75,14 @@
     {
       "name": "webdav",
       "title": "WebDAV",
-      "description": "Browse and download books from a WebDAV server.",
+      "description": "Browse and download books from a WebDAV server (Nextcloud, Koofr, ...).",
       "author": "CrossPoint",
-      "base": "https://raw.githubusercontent.com/crosspoint-reader/sd-plugins/main/webdav/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/webdav/",
       "files": [
         "manifest.json",
         "device.json",
         "plugin.js",
         "README.md"
-      ]
-    },
-    {
-      "name": "bookfusion",
-      "title": "BookFusion",
-      "description": "Browse and download your BookFusion library.",
-      "author": "CrossPoint",
-      "base": "https://raw.githubusercontent.com/crosspoint-reader/sd-plugins/main/bookfusion/",
-      "files": [
-        "manifest.json",
-        "device.json",
-        "plugin.js",
-        "README.md"
-      ]
-    },
-    {
-      "name": "organize-by-author",
-      "title": "Organize by author",
-      "description": "Sort EPUBs in a folder into per-author subfolders.",
-      "author": "CrossPoint",
-      "base": "https://raw.githubusercontent.com/crosspoint-reader/sd-plugins/main/organize-by-author/",
-      "files": [
-        "manifest.json",
-        "plugin.js"
-      ]
-    },
-    {
-      "name": "hello",
-      "title": "Hello",
-      "description": "Minimal example plugin.",
-      "author": "CrossPoint",
-      "base": "https://raw.githubusercontent.com/crosspoint-reader/sd-plugins/main/hello/",
-      "files": [
-        "manifest.json",
-        "plugin.js"
       ]
     }
   ]
