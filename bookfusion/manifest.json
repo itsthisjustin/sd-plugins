@@ -1,5 +1,7 @@
 {
   "title": "BookFusion",
   "mount": "settings",
-  "description": "Browse and download your BookFusion library on the device."
+  "description": "Browse and download your BookFusion library on the device.",
+  "author": "Diirge",
+  "version": "1.0.0"
 }

@@ -61,6 +61,20 @@ CrossPoint.registerPlugin(async (container, api) => {
     }
   }
 
+  // The installed version is whatever the installed manifest.json records; the
+  // manifest is one of the files written on install, so it always reflects the
+  // installed build. Missing/absent version => treat as older than any catalog
+  // version (so an update is offered).
+  async function installedVersion(name) {
+    try {
+      const r = await fetch('/download?path=' + encodeURIComponent(PLUGINS_DIR + '/' + name + '/manifest.json'));
+      if (!r.ok) return null;
+      return (JSON.parse(await r.text()).version) || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   async function relayText(url) {
     const r = await api.relay('GET', url, {}, '');
     if (r.error || (r.status && (r.status < 200 || r.status >= 300))) {
@@ -149,30 +163,43 @@ CrossPoint.registerPlugin(async (container, api) => {
   };
 
   // --- plugin list ---------------------------------------------------------
-  function pluginCard(p, storeName, installed) {
+  // installed: Map(name -> installed version string | null). Absent = not installed.
+  function pluginCard(p, installed) {
+    const isInstalled = installed.has(p.name);
+    const localVer = isInstalled ? installed.get(p.name) : null;
+    // Any version mismatch means an update is available (mirrors the font
+    // downloader, which treats any manifest/on-disk mismatch as an update).
+    const hasUpdate = isInstalled && p.version && localVer !== p.version;
+
     const card = document.createElement('div');
     card.className = 'setting-row';
-    const isInstalled = installed.has(p.name);
+    let state = '';
+    if (hasUpdate) state = ' <span style="color:#c0392b">Update available (v' + escapeHtml(localVer || '?') + ' → v' + escapeHtml(p.version) + ')</span>';
+    else if (isInstalled) state = ' <span style="color:#27ae60">Installed' + (p.version ? ' v' + escapeHtml(p.version) : '') + '</span>';
+    else if (p.version) state = ' <span style="color:#888">v' + escapeHtml(p.version) + '</span>';
+
     const meta = document.createElement('span');
     meta.className = 'setting-name';
     meta.innerHTML = '<strong>' + escapeHtml(p.title || p.name) + '</strong>' +
-      (p.author ? ' <span style="color:#888">by ' + escapeHtml(p.author) + '</span>' : '') +
+      (p.author ? ' <span style="color:#888">by ' + escapeHtml(p.author) + '</span>' : '') + state +
       '<br><span style="color:#666">' + escapeHtml(p.description || '') + '</span>';
+
     const controls = document.createElement('span');
     controls.className = 'setting-control';
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn-small btn-add';
-    btn.textContent = isInstalled ? 'Reinstall' : 'Install';
+    btn.textContent = hasUpdate ? 'Update' : (isInstalled ? 'Reinstall' : 'Install');
     btn.onclick = async () => {
       btn.disabled = true;
-      status('Installing ' + (p.title || p.name) + '…');
+      status((hasUpdate ? 'Updating ' : 'Installing ') + (p.title || p.name) + '…');
       try {
         await installPlugin(p);
-        status('Installed ' + (p.title || p.name) + '. Reconnect or reopen Settings to use it.');
+        status((hasUpdate ? 'Updated ' : 'Installed ') + (p.title || p.name) +
+          '. Reconnect or reopen Settings to use it.');
         refresh();
       } catch (e) {
-        status('Error installing ' + (p.title || p.name) + ': ' + e.message);
+        status('Error: ' + e.message);
         btn.disabled = false;
       }
     };
@@ -207,8 +234,12 @@ CrossPoint.registerPlugin(async (container, api) => {
     listEl.innerHTML = '';
     if (catalogs.length === 0) { status('Add a store URL to browse plugins.'); return; }
     status('Loading ' + catalogs.length + ' store' + (catalogs.length === 1 ? '' : 's') + '…');
-    const installed = await installedNames();
+    const names = await installedNames();
+    // Read the installed version for each installed plugin.
+    const installed = new Map();
+    for (const name of names) installed.set(name, await installedVersion(name));
     let total = 0;
+    let updates = 0;
     const errors = [];
     for (const url of catalogs) {
       let catalog;
@@ -226,9 +257,15 @@ CrossPoint.registerPlugin(async (container, api) => {
         header.style.margin = '0.8em 0 0.2em';
         listEl.appendChild(header);
       }
-      plugins.forEach((p) => { listEl.appendChild(pluginCard(p, storeName, installed)); total += 1; });
+      plugins.forEach((p) => {
+        if (installed.has(p.name) && p.version && installed.get(p.name) !== p.version) updates += 1;
+        listEl.appendChild(pluginCard(p, installed));
+        total += 1;
+      });
     }
-    let msg = total + ' plugin' + (total === 1 ? '' : 's') + ' available.';
+    let msg = total + ' plugin' + (total === 1 ? '' : 's') + ' available';
+    if (updates) msg += ', ' + updates + ' update' + (updates === 1 ? '' : 's');
+    msg += '.';
     if (errors.length) msg += ' (' + errors.length + ' store' + (errors.length === 1 ? '' : 's') + ' failed: ' + errors.join('; ') + ')';
     status(msg);
   }

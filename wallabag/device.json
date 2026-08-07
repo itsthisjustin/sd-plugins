@@ -21,7 +21,7 @@
   },
   "browse": {
     "format": "json",
-    "url": "{cfg.url}/api/entries.json?archive=0&perPage={limit}&page={page}",
+    "url": "{cfg.url}/api/entries.json?archive=0&detail=metadata&perPage={limit}&page={page}",
     "method": "GET",
     "headers": {
       "Authorization": "Bearer {token}"
@@ -42,5 +42,7 @@
     "dest_dir": "/Wallabag",
     "filename": "{title}.epub"
   },
-  "description": "Read your Wallabag saved articles on the device as EPUB."
+  "description": "Read your Wallabag saved articles on the device as EPUB.",
+  "author": "Diirge",
+  "version": "1.0.0"
 }

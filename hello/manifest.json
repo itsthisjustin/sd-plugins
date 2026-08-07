@@ -1,5 +1,7 @@
 {
   "title": "Hello Plugin",
   "mount": "settings",
-  "description": "Minimal example plugin."
+  "description": "Minimal example plugin.",
+  "author": "Diirge",
+  "version": "1.0.0"
 }

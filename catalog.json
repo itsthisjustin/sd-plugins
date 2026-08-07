@@ -5,7 +5,8 @@
       "name": "bookfusion",
       "title": "BookFusion",
       "description": "Browse and download your BookFusion library on the device.",
-      "author": "CrossPoint",
+      "author": "Diirge",
+      "version": "1.0.0",
       "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/bookfusion/",
       "files": [
         "manifest.json",
@@ -18,7 +19,8 @@
       "name": "hello",
       "title": "Hello Plugin",
       "description": "Minimal example plugin.",
-      "author": "CrossPoint",
+      "author": "Diirge",
+      "version": "1.0.0",
       "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/hello/",
       "files": [
         "manifest.json",
@@ -29,7 +31,8 @@
       "name": "organize-by-author",
       "title": "Sort EPUBs by Author",
       "description": "Sort EPUBs in a folder into per-author subfolders.",
-      "author": "CrossPoint",
+      "author": "Diirge",
+      "version": "1.0.0",
       "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/organize-by-author/",
       "files": [
         "manifest.json",
@@ -40,7 +43,8 @@
       "name": "plugin-store",
       "title": "Plugin Store",
       "description": "Browse and install CrossPoint plugins from a hosted catalog.",
-      "author": "CrossPoint",
+      "author": "Diirge",
+      "version": "1.0.0",
       "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/plugin-store/",
       "files": [
         "manifest.json",
@@ -52,7 +56,8 @@
       "name": "protected-content",
       "title": "Protected Content",
       "description": "Fulfill protected content from an online provider.",
-      "author": "CrossPoint",
+      "author": "Diirge",
+      "version": "1.0.0",
       "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/protected-content/",
       "files": [
         "manifest.json",
@@ -63,7 +68,8 @@
       "name": "wallabag",
       "title": "Wallabag",
       "description": "Read your Wallabag saved articles on the device as EPUB.",
-      "author": "CrossPoint",
+      "author": "Diirge",
+      "version": "1.0.0",
       "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/wallabag/",
       "files": [
         "manifest.json",
@@ -76,7 +82,8 @@
       "name": "webdav",
       "title": "WebDAV",
       "description": "Browse and download books from a WebDAV server (Nextcloud, Koofr, ...).",
-      "author": "CrossPoint",
+      "author": "Diirge",
+      "version": "1.0.0",
       "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/webdav/",
       "files": [
         "manifest.json",

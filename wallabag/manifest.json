@@ -1,5 +1,7 @@
 {
   "title": "Wallabag",
   "mount": "settings",
-  "description": "Read your Wallabag saved articles on the device as EPUB."
+  "description": "Read your Wallabag saved articles on the device as EPUB.",
+  "author": "Diirge",
+  "version": "1.0.0"
 }

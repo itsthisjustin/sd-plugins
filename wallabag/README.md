@@ -41,7 +41,9 @@ Ships both plugin surfaces:
   POSTs your stored credentials to `/oauth/v2/token`, reads the `access_token`,
   and browses/downloads with `Authorization: Bearer`. The token is short-lived;
   the engine mints a fresh one automatically each session and after any 401.
-- Browsing calls `/api/entries.json?archive=0` (unread) paged 8 at a time.
+- Browsing calls `/api/entries.json?archive=0&detail=metadata` (unread, paged
+  8 at a time). `detail=metadata` is important: without it Wallabag inlines each
+  article's full HTML, which overflows the device's response buffer.
 - Downloading calls `/api/entries/{id}/export.epub`, streamed straight to SD.
 - Credentials are stored in plain text on the SD card — treat the card
   accordingly (this matches the general plugin security model).

@@ -1,5 +1,7 @@
 {
   "title": "Sort EPUBs by Author",
   "mount": "files",
-  "description": "Sort EPUBs in a folder into per-author subfolders."
+  "description": "Sort EPUBs in a folder into per-author subfolders.",
+  "author": "Diirge",
+  "version": "1.0.0"
 }

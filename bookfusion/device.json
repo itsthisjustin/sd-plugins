@@ -58,5 +58,7 @@
       "body": "{\"grant_type\":\"urn:ietf:params:oauth:grant-type:device_code\",\"client_id\":\"koreader\",\"device_code\":\"{device_code}\"}"
     }
   },
-  "description": "Browse and download your BookFusion library on the device."
+  "description": "Browse and download your BookFusion library on the device.",
+  "author": "Diirge",
+  "version": "1.0.0"
 }
