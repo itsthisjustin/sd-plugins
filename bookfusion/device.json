@@ -1,0 +1,31 @@
+{
+  "title": "BookFusion",
+  "token": { "file": "/.crosspoint/bookfusion.json", "path": "token" },
+  "browse": {
+    "url": "https://www.bookfusion.com/api/user/books/search",
+    "method": "POST",
+    "headers": {
+      "Authorization": "Bearer {token}",
+      "Accept": "application/json; api_version=10",
+      "Content-Type": "application/json"
+    },
+    "body": "{\"page\":{page},\"per_page\":{limit},\"sort\":\"added_at-desc\"}",
+    "items": "",
+    "fields": { "title": "title", "author": "authors.0.name", "id": "id" },
+    "page_size": 8
+  },
+  "download": {
+    "url": "https://www.bookfusion.com/api/user/books/{id}/download",
+    "method": "POST",
+    "headers": {
+      "Authorization": "Bearer {token}",
+      "Accept": "application/json; api_version=10",
+      "Content-Type": "application/json"
+    },
+    "body": "{}",
+    "url_path": "url",
+    "dest_dir": "/BookFusion",
+    "filename": "{title}.epub",
+    "sidecar": { "path": "/.crosspoint/bookfusion_{md5}.json", "body": "{\"book_id\":{id}}" }
+  }
+}
