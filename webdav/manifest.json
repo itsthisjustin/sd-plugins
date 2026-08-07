@@ -1,4 +1,5 @@
 {
   "title": "WebDAV",
-  "mount": "settings"
+  "mount": "settings",
+  "description": "Browse and download books from a WebDAV server (Nextcloud, Koofr, ...)."
 }

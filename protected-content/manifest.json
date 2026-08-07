@@ -1,4 +1,5 @@
 {
   "title": "Protected Content",
-  "mount": "files"
+  "mount": "files",
+  "description": "Fulfill protected content from an online provider."
 }

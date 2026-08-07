@@ -1,4 +1,5 @@
 {
   "title": "Sort EPUBs by Author",
-  "mount": "files"
+  "mount": "files",
+  "description": "Sort EPUBs in a folder into per-author subfolders."
 }

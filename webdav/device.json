@@ -35,5 +35,6 @@
     "password": "{cfg.pass}",
     "dest_dir": "/WebDAV",
     "filename": "{title}"
-  }
+  },
+  "description": "Browse and download books from a WebDAV server (Nextcloud, Koofr, ...)."
 }

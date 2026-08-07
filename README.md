@@ -48,6 +48,12 @@ Reconnect to the device web UI; the plugin's card appears on its page. A
   then browse folders and download books on the reader itself under Settings >
   System > Plugins. Works with Nextcloud, ownCloud, Seafile, Koofr, and any
   standard WebDAV share.
+- `plugin-store/` — install other plugins from one or more hosted catalogs; see [`CATALOG.md`](CATALOG.md) for the catalog spec.
+- `wallabag/` — a Settings plugin + `device.json` pair: read your Wallabag
+  "read it later" articles on the device (Wallabag exports each as EPUB, so no
+  conversion). Enter server URL + API client + login in the web page; the
+  reader signs in silently (OAuth2 password grant) and downloads articles.
+  Works with self-hosted Wallabag or app.wallabag.it.
 - `protected-content/` — a File Manager plugin that connects the reader to a
   protected-content provider, using the device relay + crypto. It detects an
   existing `/.crosspoint/content.key`, restores its fulfillment session, and lists

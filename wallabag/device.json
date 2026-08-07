@@ -1,0 +1,46 @@
+{
+  "title": "Wallabag",
+  "token": {
+    "file": "/.crosspoint/wallabag-token.json",
+    "path": "access_token"
+  },
+  "config": {
+    "file": "/.crosspoint/wallabag.json"
+  },
+  "auth": {
+    "type": "password",
+    "request": {
+      "url": "{cfg.url}/oauth/v2/token",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": "{\"grant_type\":\"password\",\"client_id\":\"{cfg.client_id}\",\"client_secret\":\"{cfg.client_secret}\",\"username\":\"{cfg.username}\",\"password\":\"{cfg.password}\"}"
+    },
+    "token_path": "access_token"
+  },
+  "browse": {
+    "format": "json",
+    "url": "{cfg.url}/api/entries.json?archive=0&perPage={limit}&page={page}",
+    "method": "GET",
+    "headers": {
+      "Authorization": "Bearer {token}"
+    },
+    "items": "_embedded.items",
+    "fields": {
+      "title": "title",
+      "id": "id"
+    },
+    "page_size": 8
+  },
+  "download": {
+    "url": "{cfg.url}/api/entries/{id}/export.epub",
+    "method": "GET",
+    "headers": {
+      "Authorization": "Bearer {token}"
+    },
+    "dest_dir": "/Wallabag",
+    "filename": "{title}.epub"
+  },
+  "description": "Read your Wallabag saved articles on the device as EPUB."
+}

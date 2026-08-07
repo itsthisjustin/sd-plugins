@@ -1,4 +1,5 @@
 {
   "title": "Hello Plugin",
-  "mount": "settings"
+  "mount": "settings",
+  "description": "Minimal example plugin."
 }

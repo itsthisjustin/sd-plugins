@@ -1,4 +1,5 @@
 {
   "title": "BookFusion",
-  "mount": "settings"
+  "mount": "settings",
+  "description": "Browse and download your BookFusion library on the device."
 }
