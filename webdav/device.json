@@ -1,0 +1,39 @@
+{
+  "title": "WebDAV",
+  "config": {
+    "file": "/.crosspoint/webdav.json"
+  },
+  "browse": {
+    "format": "xml",
+    "url": "{cfg.url}",
+    "method": "PROPFIND",
+    "headers": {
+      "Authorization": "Basic {cfg.auth}",
+      "Depth": "1"
+    },
+    "body": "<?xml version=\"1.0\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/><d:displayname/></d:prop></d:propfind>",
+    "item": "response",
+    "fields": {
+      "title": "displayname",
+      "url": "href"
+    },
+    "container_element": "collection",
+    "skip_self": true,
+    "resolve_urls": true,
+    "extensions": [
+      ".epub",
+      ".txt",
+      ".pdf",
+      ".cbz",
+      ".mobi",
+      ".azw3",
+      ".fb2"
+    ]
+  },
+  "download": {
+    "username": "{cfg.user}",
+    "password": "{cfg.pass}",
+    "dest_dir": "/WebDAV",
+    "filename": "{title}"
+  }
+}

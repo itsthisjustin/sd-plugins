@@ -43,6 +43,11 @@ Reconnect to the device web UI; the plugin's card appears on its page. A
   BookFusion from the web page or on the reader itself (device-code flow with
   QR), then browse and download your library on-device under Settings >
   System > Plugins. Writes per-book sidecars for a future progress-sync stage.
+- `webdav/` — a Settings plugin + `device.json` pair: enter a WebDAV server
+  URL and credentials in the web page (stored in `/.crosspoint/webdav.json`),
+  then browse folders and download books on the reader itself under Settings >
+  System > Plugins. Works with Nextcloud, ownCloud, Seafile, Koofr, and any
+  standard WebDAV share.
 - `protected-content/` — a File Manager plugin that connects the reader to a
   protected-content provider, using the device relay + crypto. It detects an
   existing `/.crosspoint/content.key`, restores its fulfillment session, and lists
@@ -129,7 +134,7 @@ already uses (`/api/files`, `/mkdir`, `/move`, `/download`) — see
 |---|---|
 | `GET /api/plugins` | list discovered plugins (name/title/mount) |
 | `GET /plugin?name=&file=` | serve a file from a plugin folder |
-| `POST /api/relay` | device performs an outbound HTTP(S) call for a plugin (allow-listed) |
+| `POST /api/relay` | device performs an outbound HTTP(S) call for a plugin (any method, incl. PROPFIND) |
 | `POST /api/crypto` | generic crypto primitive — hash, random, AES, RSA, PKCS#12 (base64 I/O) |
 | `POST /api/fetch` | device downloads a URL straight to SD |
 | `POST /api/plugin-fs` | plugin writes a small file to SD |
