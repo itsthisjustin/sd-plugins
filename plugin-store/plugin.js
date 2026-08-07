@@ -92,21 +92,27 @@ CrossPoint.registerPlugin(async (container, api) => {
     } catch (e) {}
   }
 
-  async function installPlugin(p) {
+  async function installPlugin(p, onProgress) {
     const dir = PLUGINS_DIR + '/' + p.name;
     await mkdir(dir);
     const base = p.base.replace(/\/*$/, '/');
-    for (const file of p.files) {
-      const rel = file.replace(/^\/+/, '');
+    const files = p.files || [];
+    for (let i = 0; i < files.length; i++) {
+      if (onProgress) onProgress(i, files.length);
+      const rel = files[i].replace(/^\/+/, '');
       // Create any intermediate folders for files like "assets/icon.bin".
       const segs = rel.split('/');
       segs.pop();
       let cur = dir;
       for (const seg of segs) { cur += '/' + seg; await mkdir(cur); }
-      const body = await relayText(base + rel);
-      const res = await api.writeFile(dir + '/' + rel, b64(body));
-      if (!res.ok) throw new Error('could not write ' + rel);
+      // Stream each file straight to SD. /api/fetch has no size cap, unlike the
+      // relay (32 KB), so this handles large plugin.js files too.
+      const res = await api.fetchToSd(base + rel, dir + '/' + rel, {});
+      if (res.error || (res.status && (res.status < 200 || res.status >= 300))) {
+        throw new Error('download failed for ' + rel + ' (' + (res.status || res.error) + ')');
+      }
     }
+    if (onProgress) onProgress(files.length, files.length);
   }
 
   async function uninstallPlugin(p) {
@@ -189,17 +195,22 @@ CrossPoint.registerPlugin(async (container, api) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn-small btn-add';
-    btn.textContent = hasUpdate ? 'Update' : (isInstalled ? 'Reinstall' : 'Install');
+    const origLabel = hasUpdate ? 'Update' : (isInstalled ? 'Reinstall' : 'Install');
+    btn.textContent = origLabel;
     btn.onclick = async () => {
       btn.disabled = true;
-      status((hasUpdate ? 'Updating ' : 'Installing ') + (p.title || p.name) + '…');
+      const verb = hasUpdate ? 'Updating' : 'Installing';
+      status(verb + ' ' + (p.title || p.name) + '…');
       try {
-        await installPlugin(p);
+        await installPlugin(p, (done, total) => {
+          btn.textContent = verb + '… ' + done + '/' + total;
+        });
         status((hasUpdate ? 'Updated ' : 'Installed ') + (p.title || p.name) +
           '. Reconnect or reopen Settings to use it.');
         refresh();
       } catch (e) {
         status('Error: ' + e.message);
+        btn.textContent = origLabel;
         btn.disabled = false;
       }
     };

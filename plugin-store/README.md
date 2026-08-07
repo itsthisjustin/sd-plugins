@@ -65,7 +65,9 @@ its URL; users add it as another store. No firmware change, ever.
 
 ## How it works
 
-Uses only existing device capabilities: `api.relay` to fetch the catalog and
-each file (the device makes the request, so no CORS), `/mkdir` to create the
-folder, `api.writeFile` to write each file, `/delete` to remove. Files are
-small text (JSON/JS/MD), fetched and written one at a time.
+Uses only existing device capabilities: `api.relay` to fetch the catalog
+(the device makes the request, so no CORS), `/mkdir` to create the folder,
+`api.fetchToSd` to stream each plugin file straight to SD, and `/delete` to
+remove. Files install one at a time (the button shows `2/4` progress).
+`fetchToSd` has no size cap, so large `plugin.js` files install fine — unlike
+the relay, which is capped at 32 KB.
