@@ -13,16 +13,22 @@ renaming files, or opening protected content from an online provider.
 
 ## Install
 
-Copy a plugin folder to the SD card under:
+Copy a plugin folder to the SD card under any of these roots:
 
 ```
-/.crosspoint/plugins/<name>/
+/.crosspoint/plugins/<name>/     or   /plugins/<name>/   or   /.plugins/<name>/
     manifest.json     (optional)
-    plugin.js         (required)
+    plugin.js         (optional)
+    device.json       (optional)
     ...any other assets
 ```
 
-Reconnect to the device web UI; the plugin's card appears on its page.
+All three roots are scanned; `/plugins/` and `/.plugins/` at the card root are
+just easier to reach when copying from a computer. If the same plugin name
+exists in more than one root, the earlier one in the list above wins.
+
+Reconnect to the device web UI; the plugin's card appears on its page. A
+`device.json` also appears on the reader under Settings → System → Plugins.
 
 ## Layout of this folder
 
@@ -33,6 +39,10 @@ Reconnect to the device web UI; the plugin's card appears on its page.
   for "operate on the files I'm looking at" plugins. EPUB 2 and EPUB 3 creator
   sort names are supported; reading progress, cache data, and visible
   `.epub.rights` sidecars move with their book.
+- `bookfusion/` — a Settings plugin + `device.json` pair: sign in to
+  BookFusion from the web page or on the reader itself (device-code flow with
+  QR), then browse and download your library on-device under Settings >
+  System > Plugins. Writes per-book sidecars for a future progress-sync stage.
 - `protected-content/` — a File Manager plugin that connects the reader to a
   protected-content provider, using the device relay + crypto. It detects an
   existing `/.crosspoint/content.key`, restores its fulfillment session, and lists
@@ -102,6 +112,10 @@ CrossPoint.registerPlugin((container, api) => {
   // api.writeFile(path, dataB64)          -> write a small file to SD
   // api.fetchToSd(url, dest, headers)     -> device downloads a URL to SD
   // api.pluginFile(file)                  -> URL to another file in this plugin folder
+  // api.registerAction(name, fn)          -> expose an action external systems can
+  //     trigger through the device job queue (POST /api/plugin-jobs). fn(args)
+  //     runs in this page whenever it is open (including /plugins-run); return a
+  //     small result object, or throw to fail the job.
 });
 ```
 
@@ -119,3 +133,16 @@ already uses (`/api/files`, `/mkdir`, `/move`, `/download`) — see
 | `POST /api/crypto` | generic crypto primitive — hash, random, AES, RSA, PKCS#12 (base64 I/O) |
 | `POST /api/fetch` | device downloads a URL straight to SD |
 | `POST /api/plugin-fs` | plugin writes a small file to SD |
+| `POST /api/plugin-jobs` (+ `/claim`, `/complete`, `/status`) | job queue: external systems trigger registered plugin actions |
+| `GET /plugins-run` | headless page that executes queued jobs while open |
+
+## On-device screens (`device.json`)
+
+A plugin can also ship a `device.json` describing an on-device catalog screen
+(sign in via OAuth device-code, browse an authenticated JSON API, download to
+SD, write per-book sidecars) that appears under **Settings > System >
+Plugins** on the reader itself, no phone needed once set up. The manifest is
+pure data; the firmware interprets it with one generic activity. Schema
+reference: `docs/sd-plugins.md` in the crosspoint-reader repository. See
+`bookfusion/` for a complete example that ships both `plugin.js` (browser
+sign-in) and `device.json` (on-device sign-in + library browsing).

@@ -1,6 +1,9 @@
 {
   "title": "BookFusion",
-  "token": { "file": "/.crosspoint/bookfusion.json", "path": "token" },
+  "token": {
+    "file": "/.crosspoint/bookfusion.json",
+    "path": "token"
+  },
   "browse": {
     "url": "https://www.bookfusion.com/api/user/books/search",
     "method": "POST",
@@ -11,7 +14,11 @@
     },
     "body": "{\"page\":{page},\"per_page\":{limit},\"sort\":\"added_at-desc\"}",
     "items": "",
-    "fields": { "title": "title", "author": "authors.0.name", "id": "id" },
+    "fields": {
+      "title": "title",
+      "author": "authors.0.name",
+      "id": "id"
+    },
     "page_size": 8
   },
   "download": {
@@ -26,6 +33,29 @@
     "url_path": "url",
     "dest_dir": "/BookFusion",
     "filename": "{title}.epub",
-    "sidecar": { "path": "/.crosspoint/bookfusion_{md5}.json", "body": "{\"book_id\":{id}}" }
+    "sidecar": {
+      "path": "/.crosspoint/bookfusion_{md5}.json",
+      "body": "{\"book_id\":{id}}"
+    }
+  },
+  "auth": {
+    "request": {
+      "url": "https://www.bookfusion.com/api/user/auth/device",
+      "method": "POST",
+      "headers": {
+        "Accept": "application/json; api_version=10",
+        "Content-Type": "application/json"
+      },
+      "body": "{\"client_id\":\"koreader\"}"
+    },
+    "poll": {
+      "url": "https://www.bookfusion.com/api/user/auth/token",
+      "method": "POST",
+      "headers": {
+        "Accept": "application/json; api_version=10",
+        "Content-Type": "application/json"
+      },
+      "body": "{\"grant_type\":\"urn:ietf:params:oauth:grant-type:device_code\",\"client_id\":\"koreader\",\"device_code\":\"{device_code}\"}"
+    }
   }
 }
