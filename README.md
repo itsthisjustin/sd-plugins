@@ -13,7 +13,15 @@ renaming files, or opening protected content from an online provider.
 
 ## Install
 
-Copy a plugin folder to the SD card under any of these roots:
+The easiest path: download
+[`plugin-store.zip`](https://github.com/itsthisjustin/sd-plugins/releases/download/plugin-store/plugin-store.zip)
+and unzip it at the **root of your SD card** — it installs the Plugin Store
+plugin, and every other plugin here can then be installed from the store
+itself (web UI → Settings → Plugin Store, or on the reader under Settings →
+System → Plugins).
+
+To install any plugin by hand instead, copy its folder to the SD card under
+any of these roots:
 
 ```
 /.crosspoint/plugins/<name>/     or   /plugins/<name>/   or   /.plugins/<name>/

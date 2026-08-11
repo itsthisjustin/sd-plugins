@@ -1,0 +1,51 @@
+# Publishes a rolling GitHub Release ("plugin-store" tag) holding a zip of the
+# Plugin Store plugin. The zip contains plugins/plugin-store/..., so unzipping
+# it at the root of the SD card installs it into a scanned plugin root. Every
+# other plugin installs *through* the store, so this zip is the only manual
+# download a user needs.
+#
+# Stable download URL:
+#   https://github.com/itsthisjustin/sd-plugins/releases/download/plugin-store/plugin-store.zip
+name: Release Plugin Store
+
+on:
+  push:
+    branches: [main]
+    paths: ['plugin-store/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build zip
+        run: |
+          version=$(python3 -c "import json; print(json.load(open('plugin-store/manifest.json'))['version'])")
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          mkdir -p dist/plugins
+          cp -r plugin-store dist/plugins/plugin-store
+          (cd dist && zip -r ../plugin-store.zip plugins)
+          unzip -l plugin-store.zip
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Rolling release: recreate so the tag tracks the commit that built it.
+          gh release delete plugin-store --cleanup-tag --yes || true
+          gh release create plugin-store plugin-store.zip \
+            --title "Plugin Store v$VERSION" \
+            --notes "$(cat <<'EOF'
+          Unzip `plugin-store.zip` at the **root of your SD card** — it creates
+          `plugins/plugin-store/` with everything the plugin needs.
+
+          Then reconnect to the device web UI and open **Settings → Plugin
+          Store** to install any other plugin from the catalog, or use it
+          on-device under **Settings → System → Plugins**.
+          EOF
+          )"
