@@ -3,10 +3,6 @@
 Browse and install CrossPoint plugins from a hosted catalog — no need to pull
 the SD card or copy files by hand.
 
-## Install
-
-Copy this folder to the SD card at `/.crosspoint/plugins/plugin-store/`.
-
 ## Use from a browser
 
 1. Open the device web page → **Settings** → the Plugin Store card.

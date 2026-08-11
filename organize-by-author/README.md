@@ -3,9 +3,8 @@
 Tidy a folder of EPUBs by filing each book into a subfolder named for its
 author.
 
-## Install
-
-Copy this folder to the SD card at `/.crosspoint/plugins/organize-by-author/`.
+This plugin has no screen on the reader itself — it runs from the device web
+page in a browser.
 
 ## Use (from a browser)
 

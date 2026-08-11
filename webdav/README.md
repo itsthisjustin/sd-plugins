@@ -4,10 +4,6 @@ Browse and download books from a WebDAV server right on the reader. Works with
 Nextcloud, ownCloud, Seafile, Koofr, and any standard WebDAV share. (Koofr can
 bridge Google Drive, Dropbox, and OneDrive to WebDAV, so those work too.)
 
-## Install
-
-Copy this folder to the SD card at `/.crosspoint/plugins/webdav/`.
-
 ## Set up (once, from a browser)
 
 1. Open the device web page → **Settings** → the WebDAV card.

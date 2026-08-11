@@ -4,14 +4,13 @@ Open protected e-books you're authorized to read. Connect your content account
 once, then fetch a book from its authorization file and read it on the device.
 The book stays protected on the card and is unlocked only while you read it.
 
-## Install
+This plugin has no screen on the reader itself — everything below happens from
+the device web page in a browser. Fetched books open like any other book.
 
-Copy this folder to the SD card at `/.crosspoint/plugins/protected-content/`.
+## Before you start
 
 You'll need a content account. If you don't have one, you can sign up at
 [DTS ByteBooks](https://dtsbytebooks.com/register).
-
-## Before you start
 
 Everything here happens from the device web page, and it needs internet access:
 start **File Transfer** in **Join Network** mode (not Hotspot) so the reader is
