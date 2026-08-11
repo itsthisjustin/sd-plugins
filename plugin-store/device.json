@@ -1,0 +1,23 @@
+{
+  "title": "Plugin Store",
+  "description": "Browse and install CrossPoint plugins from a hosted catalog.",
+  "browse": {
+    "format": "json",
+    "url": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/refs/heads/main/catalog.json",
+    "items": "plugins",
+    "page_size": 16,
+    "fields": {
+      "title": "title",
+      "author": "description",
+      "id": "name"
+    }
+  },
+  "download": {
+    "dest_dir": "/.crosspoint/plugins",
+    "bundle": {
+      "base": "base",
+      "files": "files",
+      "subdir": "{id}"
+    }
+  }
+}

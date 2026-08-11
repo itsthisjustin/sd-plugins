@@ -3,5 +3,5 @@
   "mount": "settings",
   "description": "Browse and install CrossPoint plugins from a hosted catalog.",
   "author": "Diirge",
-  "version": "1.0.0"
+  "version": "1.1.0"
 }
