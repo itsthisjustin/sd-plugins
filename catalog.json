@@ -36,7 +36,8 @@
       "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/organize-by-author/",
       "files": [
         "manifest.json",
-        "plugin.js"
+        "plugin.js",
+        "README.md"
       ]
     },
     {
@@ -62,7 +63,8 @@
       "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/protected-content/",
       "files": [
         "manifest.json",
-        "plugin.js"
+        "plugin.js",
+        "README.md"
       ]
     },
     {
