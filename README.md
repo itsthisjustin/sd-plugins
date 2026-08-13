@@ -57,6 +57,15 @@ Reconnect to the device web UI; the plugin's card appears on its page. A
   System > Plugins. Works with Nextcloud, ownCloud, Seafile, Koofr, and any
   standard WebDAV share.
 - `plugin-store/` — install other plugins from one or more hosted catalogs; see [`CATALOG.md`](CATALOG.md) for the catalog spec.
+- `dictionaries/` — a Settings plugin + `device.json` pair: install offline
+  monolingual dictionaries (a word explained in its own language — for
+  looking up words in a book, not translating) for the reader's built-in
+  dictionary lookup. ~20 languages, generated from each language's own
+  Wiktionary edition plus Webster's 1913 for English by a scheduled mirror
+  workflow. Browse and download on the reader (Settings > System > Plugins)
+  or from the web page; files land as loose StarDict files in
+  `/dictionaries/<name>/`. The web page can also set the active dictionary
+  (`dictionaryName` in settings.json).
 - `wallabag/` — a Settings plugin + `device.json` pair: read your Wallabag
   "read it later" articles on the device (Wallabag exports each as EPUB, so no
   conversion). Enter server URL + API client + login in the web page; the
@@ -85,6 +94,30 @@ Reconnect to the device web UI; the plugin's card appears on its page. A
   a real account and authorization file are still needed for a live service test.
 
 ## Development
+
+### Creating a plugin with Claude
+
+This repo ships a [Claude Code](https://claude.com/claude-code) skill that
+knows the whole plugin contract — the browser `api` object, the `device.json`
+schema, the firmware's hard limits (32 KB relay cap, 8 KB manifest cap, no
+redirect-follow on `/api/fetch`, no on-device archive extraction), store
+registration, and the test conventions. With Claude Code open in this repo,
+just describe the plugin you want:
+
+```
+> build a plugin that syncs reading progress to my Calibre server
+```
+
+Claude picks up the skill automatically (it lives in
+[`.claude/skills/create-plugin/`](.claude/skills/create-plugin/)) and will
+scaffold the folder, write `plugin.js`/`device.json` against the documented
+firmware behavior, register the plugin in `catalog.json`, and add tests. You
+can also invoke it explicitly with `/create-plugin`. The skill's
+[reference sheet](.claude/skills/create-plugin/reference.md) doubles as
+human-readable documentation of the device API and `device.json` schema —
+useful even without Claude.
+
+### Tests
 
 The examples have a dependency-free Node smoke suite:
 
@@ -158,10 +191,41 @@ already uses (`/api/files`, `/mkdir`, `/move`, `/download`) — see
 ## On-device screens (`device.json`)
 
 A plugin can also ship a `device.json` describing an on-device catalog screen
-(sign in via OAuth device-code, browse an authenticated JSON API, download to
-SD, write per-book sidecars) that appears under **Settings > System >
-Plugins** on the reader itself, no phone needed once set up. The manifest is
-pure data; the firmware interprets it with one generic activity. Schema
-reference: `docs/sd-plugins.md` in the crosspoint-reader repository. See
-`bookfusion/` for a complete example that ships both `plugin.js` (browser
+(sign in via OAuth device-code, browse an authenticated JSON API, search it,
+download to SD, write per-book sidecars) that appears under **Settings >
+System > Plugins** on the reader itself, no phone needed once set up. The
+manifest is pure data; the firmware interprets it with one generic activity.
+Schema reference: `docs/sd-plugins.md` in the crosspoint-reader repository.
+See `bookfusion/` for a complete example that ships both `plugin.js` (browser
 sign-in) and `device.json` (on-device sign-in + library browsing).
+
+### On-device search
+
+If the catalog's server can answer queries, add a `search` block under
+`browse` and the browsing screen gains a search action that opens the
+on-device keyboard:
+
+```json
+"browse": {
+  "url": "https://example.com/api/items?page={page}&perPage={limit}",
+  "search": {
+    "url": "https://example.com/api/search?term={query}&page={page}&perPage={limit}"
+  }
+}
+```
+
+- `{query}` is the typed text, URL-encoded (safe in a URL); `{query_raw}` is
+  the verbatim text, for POST-body templates.
+- `search.url` and `search.body` each fall back to the browse `url`/`body`
+  when unset — so an API that searches via a body field only needs
+  `search.body`.
+- Results are paged like any browse view (`{page}`/`{limit}` still apply),
+  span the whole catalog rather than the current list, and **Back** returns
+  to the pre-search view.
+- JSON catalogs only (XML browse navigates by folder instead), and the server
+  does the matching — a static file host can't answer `{query}`, which is why
+  the `dictionaries/` catalog doesn't use it.
+
+`bookfusion/` is the live example: its API searches via a body field, so its
+`device.json` sets only `search.body` (with `{query_raw}` inside the JSON
+string) and reuses the browse URL.

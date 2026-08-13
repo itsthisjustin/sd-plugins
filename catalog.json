@@ -6,8 +6,22 @@
       "title": "BookFusion",
       "description": "Browse and download your BookFusion library on the device.",
       "author": "Diirge",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/bookfusion/",
+      "files": [
+        "manifest.json",
+        "device.json",
+        "plugin.js",
+        "README.md"
+      ]
+    },
+    {
+      "name": "dictionaries",
+      "title": "Dictionaries",
+      "description": "Download offline dictionaries for the built-in dictionary lookup, and pick the active one.",
+      "author": "Diirge",
+      "version": "1.0.0",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/dictionaries/",
       "files": [
         "manifest.json",
         "device.json",
@@ -72,7 +86,7 @@
       "title": "Wallabag",
       "description": "Read your Wallabag saved articles on the device as EPUB.",
       "author": "Diirge",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/wallabag/",
       "files": [
         "manifest.json",

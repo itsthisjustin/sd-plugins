@@ -13,7 +13,10 @@ download your books straight to the device.
    Plan to Read, or Completed. Move with the side buttons or touch, page
    with the **Previous page** / **Next page** rows in the list, and press
    Confirm to download a book. Back returns to the shelf picker.
-4. Books download to `/BookFusion/` on the SD card and show up alongside your
+4. To find a specific book, tap the search icon in the header (or press the
+   Search button on the top row) and type a title or author. Back leaves the
+   results and returns to the shelf.
+5. Books download to `/BookFusion/` on the SD card and show up alongside your
    other books.
 
 Prefer a browser? You can sign in the same way from the device web page →

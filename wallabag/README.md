@@ -19,6 +19,9 @@ self-hosted Wallabag or the hosted app.wallabag.it.
    **Previous page** / **Next page** rows in the list, and press Confirm to
    download an article as an EPUB to `/Wallabag/` on the SD card. Back
    returns to the view picker.
+3. To find a specific article, tap the search icon in the header (or press the
+   Search button on the top row) and type a term. Back leaves the results and
+   returns to the view picker.
 
 ## Notes
 

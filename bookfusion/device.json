@@ -26,7 +26,10 @@
       { "title": "Favorites", "body": "{\"page\":{page},\"per_page\":{limit},\"sort\":\"added_at-desc\",\"list\":\"favorites\"}" },
       { "title": "Plan to Read", "body": "{\"page\":{page},\"per_page\":{limit},\"sort\":\"added_at-desc\",\"list\":\"planned_to_read\"}" },
       { "title": "Completed", "body": "{\"page\":{page},\"per_page\":{limit},\"sort\":\"added_at-desc\",\"list\":\"completed\"}" }
-    ]
+    ],
+    "search": {
+      "body": "{\"page\":{page},\"per_page\":{limit},\"query\":\"{query_raw}\"}"
+    }
   },
   "download": {
     "url": "https://www.bookfusion.com/api/user/books/{id}/download",
@@ -67,5 +70,5 @@
   },
   "description": "Browse and download your BookFusion library on the device.",
   "author": "Diirge",
-  "version": "1.1.0"
+  "version": "1.2.0"
 }

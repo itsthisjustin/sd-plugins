@@ -117,7 +117,7 @@ class TinyDomParser {
 }
 
 test('all plugin manifests satisfy the manifest contract', async () => {
-  const plugins = ['hello', 'organize-by-author', 'protected-content'];
+  const plugins = ['hello', 'organize-by-author', 'protected-content', 'dictionaries'];
   for (const plugin of plugins) {
     const manifest = JSON.parse(await readFile(new URL(plugin + '/manifest.json', root), 'utf8'));
     assert.equal(typeof manifest.title, 'string', plugin + ' needs a title');
@@ -189,6 +189,72 @@ test('organizer uses the creator file-as and moves a rights sidecar', async () =
     { path: '/Books/Earthsea.epub.rights', dest: '/Books/Le Guin, Ursula' },
   ]);
   assert.match(document.elements['org-status'].textContent, /Filed 1/);
+});
+
+test('dictionaries installs through redirects and sets the active dictionary without clobbering settings', async () => {
+  const document = fakeDocument([
+    'fd-status', 'fd-list', 'fd-active', 'fd-set-active', 'fd-search', 'fd-active-note',
+    'fd-install-afr-deu', 'fd-install-eng-deu', 'fd-remove-afr-deu', 'fd-remove-eng-deu',
+  ]);
+  const index = { items: [
+    { id: 'afr-deu', title: 'Afrikaans - German', author: '4k entries, 0.1 MB',
+      base: 'https://github.com/example/releases/download/freedict/',
+      files: ['afr-deu.ifo', 'afr-deu.idx', 'afr-deu.dict.dz'] },
+    { id: 'eng-deu', title: 'English - German', author: '460k entries, 31.3 MB',
+      base: 'https://github.com/example/releases/download/freedict/',
+      files: ['eng-deu.ifo', 'eng-deu.idx', 'eng-deu.dict.dz'] },
+  ] };
+  const writes = [];
+  const downloads = [];
+  const api = {
+    async relay(method, url) {
+      assert.equal(method, 'HEAD');
+      if (url.includes('github.com/example')) {
+        return { status: 302, body: '', headers: [['Location', url.replace('github.com/example', 'objects.example.com')]] };
+      }
+      return { status: 200, body: '', headers: [] };
+    },
+    async writeFile(path, dataB64) {
+      writes.push({ path, data: Buffer.from(dataB64, 'base64').toString('utf8') });
+      return { ok: true, bytes: dataB64.length };
+    },
+    async fetchToSd(url, dest) {
+      downloads.push({ url, dest });
+      return { status: 200, bytes: 1000, complete: true };
+    },
+  };
+  async function fetch(url) {
+    if (url.startsWith('https://raw.githubusercontent.com/')) return response({ json: index });
+    if (url.startsWith('/api/files')) return response({ json: [{ name: 'afr-deu', isDirectory: true }] });
+    if (url.startsWith('/download?path=%2F.crosspoint%2Fsettings.json')) {
+      return response({ text: '{"fontPointSize":12,"dictionaryName":"afr-deu"}' });
+    }
+    throw new Error('unexpected fetch: ' + url);
+  }
+
+  const { render } = await loadPlugin('dictionaries/plugin.js', { document, fetch });
+  await render({ innerHTML: '' }, api);
+
+  assert.match(document.elements['fd-status'].textContent, /2 dictionaries available/);
+  assert.match(document.elements['fd-active'].innerHTML, /afr-deu/);
+  assert.equal(document.elements['fd-active'].value, 'afr-deu');
+  assert.match(document.elements['fd-list'].innerHTML, /English - German/);
+
+  // Install follows the release-asset redirect before streaming to SD.
+  await document.elements['fd-install-eng-deu'].onclick();
+  assert.equal(downloads.length, 3);
+  assert.equal(downloads[0].url, 'https://objects.example.com/releases/download/freedict/eng-deu.ifo');
+  assert.equal(downloads[0].dest, '/dictionaries/eng-deu/eng-deu.ifo');
+  assert.equal(downloads[2].dest, '/dictionaries/eng-deu/eng-deu.dict.dz');
+
+  // Setting the active dictionary rewrites settings.json but keeps other keys.
+  document.elements['fd-active'].value = 'eng-deu';
+  await document.elements['fd-set-active'].onclick();
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].path, '/.crosspoint/settings.json');
+  const saved = JSON.parse(writes[0].data);
+  assert.equal(saved.dictionaryName, 'eng-deu');
+  assert.equal(saved.fontPointSize, 12);
 });
 
 test('protected content restores content.key, writes rights first, and fulfills without rewriting credentials', async () => {

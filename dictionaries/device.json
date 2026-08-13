@@ -1,0 +1,26 @@
+{
+  "title": "Dictionaries",
+  "browse": {
+    "format": "json",
+    "url": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/refs/heads/main/dictionaries/catalog/all-{page}.json",
+    "method": "GET",
+    "items": "items",
+    "fields": {
+      "title": "title",
+      "author": "author",
+      "id": "id"
+    },
+    "page_size": 8
+  },
+  "download": {
+    "dest_dir": "/dictionaries",
+    "bundle": {
+      "base": "base",
+      "files": "files",
+      "subdir": "{id}"
+    }
+  },
+  "description": "Download offline dictionaries into /dictionaries.",
+  "author": "Diirge",
+  "version": "1.0.0"
+}

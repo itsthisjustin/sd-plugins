@@ -1,0 +1,257 @@
+{
+ "generated": "2026-08-13",
+ "items": [
+  {
+   "id": "english",
+   "title": "English",
+   "author": "1385k entries, 58.7 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "english.ifo",
+    "english.idx",
+    "english.dict.dz"
+   ],
+   "bytes": 61546863
+  },
+  {
+   "id": "chinese",
+   "title": "Chinese",
+   "author": "69k entries, 3.3 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "chinese.ifo",
+    "chinese.idx",
+    "chinese.dict.dz"
+   ],
+   "bytes": 3485388
+  },
+  {
+   "id": "czech",
+   "title": "Czech",
+   "author": "66k entries, 3.0 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "czech.ifo",
+    "czech.idx",
+    "czech.dict.dz"
+   ],
+   "bytes": 3146088
+  },
+  {
+   "id": "dutch",
+   "title": "Dutch",
+   "author": "646k entries, 24.9 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "dutch.ifo",
+    "dutch.idx",
+    "dutch.dict.dz"
+   ],
+   "bytes": 26122387
+  },
+  {
+   "id": "webster1913",
+   "title": "English (Webster 1913)",
+   "author": "160k entries, 28.9 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "webster1913.ifo",
+    "webster1913.idx",
+    "webster1913.dict.dz"
+   ],
+   "bytes": 30354799
+  },
+  {
+   "id": "french",
+   "title": "French",
+   "author": "2032k entries, 70.2 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "french.ifo",
+    "french.idx",
+    "french.dict.dz"
+   ],
+   "bytes": 73613712
+  },
+  {
+   "id": "german",
+   "title": "German",
+   "author": "955k entries, 42.9 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "german.ifo",
+    "german.idx",
+    "german.dict.dz"
+   ],
+   "bytes": 44970049
+  },
+  {
+   "id": "greek",
+   "title": "Greek",
+   "author": "768k entries, 31.2 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "greek.ifo",
+    "greek.idx",
+    "greek.dict.dz"
+   ],
+   "bytes": 32765058
+  },
+  {
+   "id": "indonesian",
+   "title": "Indonesian",
+   "author": "47k entries, 1.6 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "indonesian.ifo",
+    "indonesian.idx",
+    "indonesian.dict.dz"
+   ],
+   "bytes": 1685604
+  },
+  {
+   "id": "italian",
+   "title": "Italian",
+   "author": "541k entries, 16.3 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "italian.ifo",
+    "italian.idx",
+    "italian.dict.dz"
+   ],
+   "bytes": 17114143
+  },
+  {
+   "id": "japanese",
+   "title": "Japanese",
+   "author": "123k entries, 6.5 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "japanese.ifo",
+    "japanese.idx",
+    "japanese.dict.dz"
+   ],
+   "bytes": 6848180
+  },
+  {
+   "id": "korean",
+   "title": "Korean",
+   "author": "68k entries, 2.6 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "korean.ifo",
+    "korean.idx",
+    "korean.dict.dz"
+   ],
+   "bytes": 2700409
+  },
+  {
+   "id": "kurdish",
+   "title": "Kurdish (Kurmanji)",
+   "author": "440k entries, 13.7 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "kurdish.ifo",
+    "kurdish.idx",
+    "kurdish.dict.dz"
+   ],
+   "bytes": 14362901
+  },
+  {
+   "id": "malay",
+   "title": "Malay",
+   "author": "11k entries, 0.5 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "malay.ifo",
+    "malay.idx",
+    "malay.dict.dz"
+   ],
+   "bytes": 485760
+  },
+  {
+   "id": "polish",
+   "title": "Polish",
+   "author": "115k entries, 5.8 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "polish.ifo",
+    "polish.idx",
+    "polish.dict.dz"
+   ],
+   "bytes": 6047890
+  },
+  {
+   "id": "portuguese",
+   "title": "Portuguese",
+   "author": "382k entries, 12.6 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "portuguese.ifo",
+    "portuguese.idx",
+    "portuguese.dict.dz"
+   ],
+   "bytes": 13230192
+  },
+  {
+   "id": "russian",
+   "title": "Russian",
+   "author": "455k entries, 25.2 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "russian.ifo",
+    "russian.idx",
+    "russian.dict.dz"
+   ],
+   "bytes": 26437435
+  },
+  {
+   "id": "spanish",
+   "title": "Spanish",
+   "author": "834k entries, 26.0 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "spanish.ifo",
+    "spanish.idx",
+    "spanish.dict.dz"
+   ],
+   "bytes": 27238529
+  },
+  {
+   "id": "thai",
+   "title": "Thai",
+   "author": "29k entries, 2.0 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "thai.ifo",
+    "thai.idx",
+    "thai.dict.dz"
+   ],
+   "bytes": 2138605
+  },
+  {
+   "id": "turkish",
+   "title": "Turkish",
+   "author": "308k entries, 11.5 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "turkish.ifo",
+    "turkish.idx",
+    "turkish.dict.dz"
+   ],
+   "bytes": 12065248
+  },
+  {
+   "id": "vietnamese",
+   "title": "Vietnamese",
+   "author": "41k entries, 2.2 MB",
+   "base": "https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/",
+   "files": [
+    "vietnamese.ifo",
+    "vietnamese.idx",
+    "vietnamese.dict.dz"
+   ],
+   "bytes": 2330367
+  }
+ ]
+}

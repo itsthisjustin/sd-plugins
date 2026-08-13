@@ -37,7 +37,10 @@
       { "title": "Starred", "url": "{cfg.url}/api/entries.json?starred=1&detail=metadata&perPage={limit}&page={page}" },
       { "title": "Archived", "url": "{cfg.url}/api/entries.json?archive=1&detail=metadata&perPage={limit}&page={page}" },
       { "title": "All", "url": "{cfg.url}/api/entries.json?detail=metadata&perPage={limit}&page={page}" }
-    ]
+    ],
+    "search": {
+      "url": "{cfg.url}/api/search.json?term={query}&perPage={limit}&page={page}"
+    }
   },
   "download": {
     "url": "{cfg.url}/api/entries/{id}/export.epub",
@@ -50,5 +53,5 @@
   },
   "description": "Read your Wallabag saved articles on the device as EPUB.",
   "author": "Diirge",
-  "version": "1.1.0"
+  "version": "1.2.0"
 }

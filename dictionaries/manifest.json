@@ -1,0 +1,7 @@
+{
+  "title": "Dictionaries",
+  "mount": "settings",
+  "description": "Download offline dictionaries for the built-in dictionary lookup, and pick the active one.",
+  "author": "Diirge",
+  "version": "1.0.0"
+}
