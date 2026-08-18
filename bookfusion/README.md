@@ -22,6 +22,20 @@ download your books straight to the device.
 Prefer a browser? You can sign in the same way from the device web page →
 **Settings** → the BookFusion card.
 
+## Progress sync
+
+Every downloaded book gets a small metadata file next to it
+(`<book>.epub.meta.json`) holding its BookFusion book id. To have your reading
+progress reach BookFusion:
+
+1. On the reader, set up **KOReader Sync** with a CrossPoint sync server
+   (`https://sync.crosspointreader.com/`) as the server.
+2. Enable **Send book metadata** in the KOSync settings.
+
+Progress uploads then carry the BookFusion id, and the sync server forwards
+your position to BookFusion. Books fetched before this plugin version have no
+metadata file; re-download them (or create the file by hand) to include them.
+
 ## Sign out
 
 Tap **Sign out** on the web Settings card, or delete

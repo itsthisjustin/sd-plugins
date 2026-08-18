@@ -13,7 +13,7 @@ firmware — these are hard limits, not conventions.
 | `api.relay(method, url, headers, body)` | `{status, headers, body}` | Device makes the HTTP(S) call (no CORS). **Response body capped at 32 KB.** Does NOT follow redirects — a 3xx comes back with its `Location` in `headers` (an array of `[name, value]` pairs, duplicates preserved). |
 | `api.fetchToSd(url, dest, headers)` | `{status, bytes, complete, total}` | Device streams the URL straight to a SD path, creating parent dirs. Resumes internally with Range requests (2 MB segments). **Does NOT follow redirects** — resolve them first via `relay('HEAD', ...)` hops (see `dictionaries/plugin.js` `resolveUrl`). |
 | `api.writeFile(path, dataB64)` | `{ok, bytes}` | Base64 body; creates parent dirs. Any absolute path without `..` is allowed (including `/.crosspoint/settings.json`). Small files only (server request cap ~32–64 KB). |
-| `api.crypto(op, fields)` | op-specific | Base64 I/O. Ops: `random`, `sha1`, `sha256`, `aesenc`, `aesdec`, `genrsa`, `rsaenc`, `rsadec`, `pkcs12decode`. |
+| `api.crypto(op, fields)` | op-specific | Base64 I/O. Ops: `random {len}` → `{data}`; `sha1 {data}` → `{data}` (20-byte digest); `aesenc`/`aesdec {key, iv, data}` → `{data}` (AES-128-CBC, 16-byte key/iv; enc adds PKCS#7 padding, dec strips it); `keygen {}` → `{public, private}` (RSA-2048, SPKI/PKCS#8 DER); `pubencrypt {cert, data}` → `{data}` (cert = DER certificate); `sign {private, hash}` → `{data}` (RSA over an already-computed 20-byte SHA-1 digest); `pkcs12 {data, password}` → `{key, cert}`. Failures return `{error}`. |
 | `api.cookiesFrom(resp, existing?)` | cookie string | Builds a `Cookie` header from a relay response's `Set-Cookie` headers. |
 | `api.registerAction(name, fn)` | — | Exposes a headless action for POST `/api/plugin-jobs`. |
 | `api.pluginFile(file)` | URL string | URL to another file in this plugin's folder. |
@@ -76,7 +76,17 @@ function b64(str) {
     "bundle": { "base": "base", "files": "files", "subdir": "{id}" },
     "sidecar": { "path": "/.crosspoint/x_{md5}.json", "body": "..." }
   },
-  "auth": { "type": "device_code" /* or "password" */, "request": {...}, "poll": {...} }
+  "auth": { "type": "device_code" /* or "password" */, "request": {...}, "poll": {...} },
+  "events": {                      // optional reader-lifecycle handlers, drained
+    "reader.exit": {               // when the device is online (deferred delivery)
+      "request": { "method": "POST", "url": "{cfg.server}/progress", "body": "..." },
+      "toast": "Synced {event.book}"
+    }
+    // events: reader.open, reader.exit, book.downloaded, sleep.enter.
+    // Handler = "request" or "download" (+ optional "toast", "connect").
+    // Extra variables: {event.NAME}, {event.ts}, {meta.KEY} (book sidecar).
+    // Full semantics + limits: firmware docs/plugin-events.md.
+  }
 }
 ```
 

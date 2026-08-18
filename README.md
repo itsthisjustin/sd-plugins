@@ -50,7 +50,10 @@ Reconnect to the device web UI; the plugin's card appears on its page. A
 - `bookfusion/` — a Settings plugin + `device.json` pair: sign in to
   BookFusion from the web page or on the reader itself (device-code flow with
   QR), then browse and download your library on-device under Settings >
-  System > Plugins. Writes per-book sidecars for a future progress-sync stage.
+  System > Plugins. Writes each book's `<book>.meta.json` sidecar with its
+  BookFusion id, which rides KOSync progress uploads (enable "Send book
+  metadata" on the reader) so a CrossPoint sync server can forward progress
+  to BookFusion.
 - `webdav/` — a Settings plugin + `device.json` pair: enter a WebDAV server
   URL and credentials in the web page (stored in `/.crosspoint/webdav.json`),
   then browse folders and download books on the reader itself under Settings >
