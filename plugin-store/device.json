@@ -9,8 +9,10 @@
     "fields": {
       "title": "title",
       "author": "description",
-      "id": "name"
-    }
+      "id": "name",
+      "version": "version"
+    },
+    "installed_root": "/.crosspoint/plugins"
   },
   "download": {
     "dest_dir": "/.crosspoint/plugins",
