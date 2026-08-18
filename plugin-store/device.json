@@ -11,8 +11,7 @@
       "author": "description",
       "id": "name",
       "version": "version"
-    },
-    "installed_root": "/.crosspoint/plugins"
+    }
   },
   "download": {
     "dest_dir": "/.crosspoint/plugins",
