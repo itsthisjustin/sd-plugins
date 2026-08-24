@@ -108,6 +108,19 @@
         "plugin.js",
         "README.md"
       ]
+    },
+    {
+      "name": "libby",
+      "title": "Libby",
+      "description": "Link Libby, view your loans, and fulfill them to the device (ebooks). Requires Protected Content.",
+      "author": "Diirge",
+      "version": "0.1.0",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/libby/",
+      "files": [
+        "manifest.json",
+        "plugin.js",
+        "README.md"
+      ]
     }
   ]
 }

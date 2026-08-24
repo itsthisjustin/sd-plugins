@@ -532,7 +532,10 @@ CrossPoint.registerPlugin(async (container, api) => {
     throw new Error('too many books named “' + title + '”');
   }
 
-  async function fulfill(acsmText, destDir) {
+  // opts.existingDest: renewing an already-fulfilled book — reuse that .epub on
+  // the card and only refresh its license sidecar (no re-download).
+  async function fulfill(acsmText, destDir, opts) {
+    opts = opts || {};
     const d = session.device, act = session.act;
     const acsmRoot = parseXml(acsmText);
     if (!acsmRoot.name.endsWith('fulfillmentToken')) throw new Error('not an .acsm (root <' + acsmRoot.name + '>)');
@@ -611,13 +614,20 @@ CrossPoint.registerPlugin(async (container, api) => {
       .trim()
       .replace(/^\.+|\.+$/g, '')
       .slice(0, 60) || 'book';
-    const dest = await uniqueBookDestination(safeTitle, destDir);
+    // A renewal reuses the book already on the card; a fresh borrow picks a new
+    // filename and downloads it below.
+    const renewing = !!opts.existingDest;
+    const dest = renewing ? opts.existingDest : await uniqueBookDestination(safeTitle, destDir);
     // Persist the license before starting the long transfer. If the phone
     // disconnects after the device finishes the EPUB but before the browser
     // receives that completion response, the downloaded book is still usable.
-    status('Saving rights for “' + safeTitle + '”…');
+    status(renewing ? ('Refreshing loan for “' + safeTitle + '”…') : ('Saving rights for “' + safeTitle + '”…'));
     const rightsWrite = await api.writeFile(dest + '.rights', bytesToB64(te.encode(rightsXml)));
     if (!rightsWrite.ok) throw new Error('could not write the book rights sidecar');
+
+    // Renewal changes only the license, not the encrypted book bytes, so skip
+    // the multi-MB re-download entirely and keep the existing file.
+    if (renewing) return { title: safeTitle, dest, bytes: 0, renewed: true };
 
     status('Downloading “' + safeTitle + '” to the device…');
     // The payload is already content-encrypted end to end, so transport TLS
@@ -918,6 +928,28 @@ CrossPoint.registerPlugin(async (container, api) => {
       await writeCredential();
       await deleteFile(path);
       return { title: r.title, dest: r.dest, bytes: r.bytes || 0 };
+    });
+
+    // Renew an expired (or expiring) loan without re-downloading the book. The
+    // library issues a fresh .acsm when you renew the loan there; point this at
+    // that new .acsm plus the book already on the card, and only the license
+    // sidecar is rewritten (same encrypted bytes, new expiry).
+    //   POST /api/plugin-jobs {plugin:"protected-content", action:"renew",
+    //                          args:{book:"/folder/book.epub", acsm:"/folder/renewed.acsm"}}
+    api.registerAction('renew', async (args) => {
+      const book = String((args && args.book) || '');
+      const acsm = String((args && args.acsm) || '');
+      if (!book.startsWith('/')) throw new Error('args.book must be an absolute .epub path');
+      if (!acsm.startsWith('/')) throw new Error('args.acsm must be an absolute .acsm path');
+      if (!session || !session.act || !session.act.deviceUuid) {
+        throw new Error('device not activated; open the plugin UI once to sign in');
+      }
+      const acsmResponse = await fetch('/download?path=' + encodeURIComponent(acsm));
+      if (!acsmResponse.ok) throw new Error('could not read ' + acsm + ' (HTTP ' + acsmResponse.status + ')');
+      const r = await fulfill(await acsmResponse.text(), null, { existingDest: book });
+      await writeCredential();
+      await deleteFile(acsm);
+      return { title: r.title, dest: r.dest, renewed: true };
     });
   }
 
