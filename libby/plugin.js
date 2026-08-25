@@ -181,9 +181,30 @@ CrossPoint.registerPlugin(async (container, api) => {
 
   async function getLoans() {
     if (!identity) throw new Error('not linked to Libby');
-    const r = await sentry('GET', '/chip/sync', identity);
-    if (r.status !== 200 || !r.body) throw new Error('Libby sync failed (HTTP ' + r.status + ')');
-    return Array.isArray(r.body.loans) ? r.body.loans : [];
+    // /chip/sync returns every card, loan, hold and library's metadata in one
+    // response — large for multi-card accounts. Stream it to SD instead of
+    // relaying it through device RAM (the relay buffers the whole body and OOMs
+    // a low-heap device like the X3). The browser parses the file itself.
+    const SYNC_FILE = '/.crosspoint/libby-sync.json';
+    const r = await api.fetchToSd(SENTRY + '/chip/sync', SYNC_FILE, {
+      'Authorization': 'Bearer ' + identity,
+      'Accept': 'application/json',
+      'Referer': 'https://libbyapp.com/',
+      'Origin': 'https://libbyapp.com',
+    });
+    if (r.error || (r.status && (r.status < 200 || r.status >= 300))) {
+      throw new Error('Libby sync failed (HTTP ' + (r.status || r.error) + ')');
+    }
+    let body;
+    try {
+      const resp = await fetch('/download?path=' + encodeURIComponent(SYNC_FILE));
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      body = JSON.parse(await resp.text());
+    } catch (e) {
+      throw new Error('could not read Libby sync: ' + e.message);
+    }
+    await deleteFile(SYNC_FILE);  // account metadata; don't leave it on the card
+    return Array.isArray(body.loans) ? body.loans : [];
   }
 
   function pickAdobeEpubFormat(loan) {

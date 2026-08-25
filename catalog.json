@@ -114,7 +114,7 @@
       "title": "Libby",
       "description": "Link Libby, view your loans, and fulfill them to the device (ebooks). Requires Protected Content.",
       "author": "Diirge",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/libby/",
       "files": [
         "manifest.json",

@@ -3,5 +3,5 @@
   "mount": "files",
   "description": "Link Libby, view your library loans, and fulfill them to the device (ebooks).",
   "author": "Diirge",
-  "version": "0.1.0"
+  "version": "0.2.0"
 }
