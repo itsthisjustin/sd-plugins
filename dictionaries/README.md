@@ -46,7 +46,10 @@ workflow in this repo
 ([`dictionaries-mirror.yml`](../.github/workflows/dictionaries-mirror.yml))
 generates them from [kaikki.org](https://kaikki.org)'s machine-readable
 Wiktionary extracts — matched to the reader's dictionary engine (index sort
-order, dictzip chunking, headword/definition size limits) — and hosts them as
+order, dictzip chunking, headword/definition size limits). Inflected forms
+("cats", "ran") resolve straight to the lemma's full definition instead of a
+bare "plural of cat" stub — the stub would otherwise shadow the reader's own
+stemming fallback. The files are hosted as
 assets on the rolling
 [`dictionaries` release](https://github.com/itsthisjustin/sd-plugins/releases/tag/dictionaries).
 The browse catalog under [`catalog/`](catalog/) is regenerated in the same
