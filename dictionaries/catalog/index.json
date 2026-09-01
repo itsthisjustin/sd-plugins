@@ -1,5 +1,5 @@
 {
- "generated": "2026-08-13",
+ "generated": "2026-09-01",
  "items": [
   {
    "id": "english",
@@ -11,7 +11,7 @@
     "english.idx",
     "english.dict.dz"
    ],
-   "bytes": 61546863
+   "bytes": 61547016
   },
   {
    "id": "chinese",
