@@ -924,21 +924,25 @@ CrossPoint.registerPlugin(async (container, api) => {
       const acsmResponse = await fetch('/download?path=' + encodeURIComponent(path));
       if (!acsmResponse.ok) throw new Error('could not read ' + path + ' (HTTP ' + acsmResponse.status + ')');
       const destDir = path.slice(0, path.lastIndexOf('/')) || '/';
-      const r = await fulfill(await acsmResponse.text(), destDir);
-      // The book, its rights sidecar, and the download are all on the card now,
-      // so the book is fully usable. Re-persisting the credential only refreshes
-      // the cached operator-auth session (an optimization for the next fulfill),
-      // and it runs at the most heap-fragmented moment in the flow — right after
-      // the multi-MB download — where the device WebServer can fail to buffer the
-      // POST body and /api/plugin-fs returns 400 "empty body". A failure there
-      // must not fail an otherwise-complete fulfillment; the existing credential
-      // from activation stays valid and the next run just re-does operator auth.
+      let r;
       try {
-        await writeCredential();
+        r = await fulfill(await acsmResponse.text(), destDir);
       } catch (e) {
-        console.warn('protected-content: credential refresh skipped: ' + (e && e.message));
+        status('Error: ' + e.message);
+        throw e;
       }
+      // Same decision as the manual button above: fulfillment only adds
+      // disposable operator-auth cache to the in-memory session, so do not
+      // rewrite the permanent content credential for it — especially not here,
+      // right after the multi-MB download, when the fragmented heap can make
+      // /api/plugin-fs reject the write (400 "empty body") and fail an
+      // otherwise-complete fulfillment.
       await deleteFile(path);
+      // Mirror the manual path's completion message so this card doesn't stay
+      // frozen on "Downloading…" while the triggering plugin (e.g. Libby)
+      // reports the book as delivered.
+      status('Fetched “' + r.title + '” (' + (r.bytes || '?') + ' bytes) to ' + r.dest + '.\n' +
+        'Open it from the reader — it decrypts on-device.');
       return { title: r.title, dest: r.dest, bytes: r.bytes || 0 };
     });
 
@@ -958,16 +962,16 @@ CrossPoint.registerPlugin(async (container, api) => {
       }
       const acsmResponse = await fetch('/download?path=' + encodeURIComponent(acsm));
       if (!acsmResponse.ok) throw new Error('could not read ' + acsm + ' (HTTP ' + acsmResponse.status + ')');
-      const r = await fulfill(await acsmResponse.text(), null, { existingDest: book });
-      // Best-effort credential refresh (see the fulfill action): the renewed
-      // rights sidecar is already written, so a transient plugin-fs failure
-      // must not fail the renewal.
+      let r;
       try {
-        await writeCredential();
+        r = await fulfill(await acsmResponse.text(), null, { existingDest: book });
       } catch (e) {
-        console.warn('protected-content: credential refresh skipped: ' + (e && e.message));
+        status('Error: ' + e.message);
+        throw e;
       }
+      // No credential rewrite: see the fulfill action above.
       await deleteFile(acsm);
+      status('Refreshed the loan for “' + r.title + '”.');
       return { title: r.title, dest: r.dest, renewed: true };
     });
   }
