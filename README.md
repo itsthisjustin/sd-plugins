@@ -160,9 +160,6 @@ CrossPoint.registerPlugin((container, api) => {
   //     request headers are an object; response headers are an ordered list of
   //     [name, value] pairs with duplicates preserved (including every
   //     Set-Cookie).
-  // api.cookiesFrom(resp, existing?)      -> a "k=v; k2=v2" Cookie string,
-  //     built from a relay response's Set-Cookie headers (carry a session
-  //     across requests). Generic: it just reads the standard header.
   // api.crypto(op, fields)                -> wolfSSL primitive (base64 I/O)
   // api.writeFile(path, dataB64)          -> write a small file to SD
   // api.fetchToSd(url, dest, headers)     -> device downloads a URL to SD
