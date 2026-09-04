@@ -925,7 +925,19 @@ CrossPoint.registerPlugin(async (container, api) => {
       if (!acsmResponse.ok) throw new Error('could not read ' + path + ' (HTTP ' + acsmResponse.status + ')');
       const destDir = path.slice(0, path.lastIndexOf('/')) || '/';
       const r = await fulfill(await acsmResponse.text(), destDir);
-      await writeCredential();
+      // The book, its rights sidecar, and the download are all on the card now,
+      // so the book is fully usable. Re-persisting the credential only refreshes
+      // the cached operator-auth session (an optimization for the next fulfill),
+      // and it runs at the most heap-fragmented moment in the flow — right after
+      // the multi-MB download — where the device WebServer can fail to buffer the
+      // POST body and /api/plugin-fs returns 400 "empty body". A failure there
+      // must not fail an otherwise-complete fulfillment; the existing credential
+      // from activation stays valid and the next run just re-does operator auth.
+      try {
+        await writeCredential();
+      } catch (e) {
+        console.warn('protected-content: credential refresh skipped: ' + (e && e.message));
+      }
       await deleteFile(path);
       return { title: r.title, dest: r.dest, bytes: r.bytes || 0 };
     });
@@ -947,7 +959,14 @@ CrossPoint.registerPlugin(async (container, api) => {
       const acsmResponse = await fetch('/download?path=' + encodeURIComponent(acsm));
       if (!acsmResponse.ok) throw new Error('could not read ' + acsm + ' (HTTP ' + acsmResponse.status + ')');
       const r = await fulfill(await acsmResponse.text(), null, { existingDest: book });
-      await writeCredential();
+      // Best-effort credential refresh (see the fulfill action): the renewed
+      // rights sidecar is already written, so a transient plugin-fs failure
+      // must not fail the renewal.
+      try {
+        await writeCredential();
+      } catch (e) {
+        console.warn('protected-content: credential refresh skipped: ' + (e && e.message));
+      }
       await deleteFile(acsm);
       return { title: r.title, dest: r.dest, renewed: true };
     });
