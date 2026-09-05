@@ -13,6 +13,10 @@
 //   - .idx sorted with asciiCaseCmp: bytewise, ASCII tolower per byte
 //   - headwords equal under that comparator share one merged definition
 //     (otherwise only the first of "march"/"March" is ever reachable)
+//   - inflected forms ("cats", carrying form_of/alt_of in the source) point
+//     their .idx rows at the lemma's definition bytes instead of keeping the
+//     bare "plural of cat" stub: a direct .idx hit preempts the reader's
+//     .syn and stemming fallbacks, so the stub would otherwise win
 //   - headwords < 256 bytes, definitions < 64 KB, 32-bit offsets
 //   - dictzip chunks decompress independently (raw deflate per chunk),
 //     chunk table <= 8192 entries (~460 MB uncompressed ceiling)
@@ -34,9 +38,9 @@ import { createGunzip, createDeflateRaw, gunzipSync, crc32, constants as zconst 
 import { createInterface } from 'node:readline';
 import { join, basename } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 const RELEASE_BASE = 'https://github.com/itsthisjustin/sd-plugins/releases/download/dictionaries/';
-const CATALOG_DIR = new URL('../dictionaries/catalog/', import.meta.url).pathname;
 const PAGE_SIZE = 8;
 
 // One entry per language: its own Wiktionary edition, so definitions are in
@@ -81,6 +85,19 @@ const flag = (name, fallback) => {
 const OUT = flag('out', 'dist');
 const ONLY = (flag('only', '') || '').split(',').filter(Boolean);
 const FROM_INDEX = args.includes('--from-index');
+// Overridable so tests can build into a scratch dir without touching the
+// committed catalog.
+const CATALOG_DIR = flag('catalog-dir', fileURLToPath(new URL('../dictionaries/catalog/', import.meta.url)));
+// --source id=url (comma-separated): override a source's URL, or add a new
+// kaikki-kind source. Mainly for testing — curl accepts file:// URLs.
+for (const spec of (flag('source', '') || '').split(',').filter(Boolean)) {
+  const eq = spec.indexOf('=');
+  const id = spec.slice(0, eq);
+  const url = spec.slice(eq + 1);
+  const existing = SOURCES.find((s) => s.id === id);
+  if (existing) existing.url = url;
+  else SOURCES.push({ id, title: id, kind: 'kaikki', url });
+}
 
 function curl(url, dest) {
   execFileSync('curl', ['-fsSL', '--retry', '3', '--retry-delay', '5', '-o', dest, url], { stdio: 'inherit' });
@@ -148,42 +165,107 @@ async function dictzip(dictBuf, dest) {
   writeFileSync(dest, Buffer.concat([header, extra, ...chunks, trailer]));
 }
 
-// entries: Map<headword, blockText>. Writes <id>.ifo/.idx/.dict.dz into dir
-// and returns catalog metadata.
+// entries: Map<headword, blockText | {text, refs, pure}> — refs are lemma
+// headwords this entry's form_of/alt_of senses point at; pure means every
+// sense is such a reference. Writes <id>.ifo/.idx/.dict.dz into dir and
+// returns catalog metadata.
 async function writeStardict(dir, id, title, entries) {
   // Group headwords that the reader's case-insensitive comparator cannot tell
   // apart; each gets its own .idx row pointing at the shared merged text.
   const groups = new Map();
-  for (const [word, text] of entries) {
+  for (const [word, entry] of entries) {
+    const e = typeof entry === 'string' ? { text: entry, refs: [], pure: false } : entry;
     const wordBuf = Buffer.from(word, 'utf8');
     if (wordBuf.length === 0 || wordBuf.length > MAX_HEADWORD_BYTES || wordBuf.includes(0)) continue;
     const key = foldKey(wordBuf).toString('latin1');
     let g = groups.get(key);
-    if (!g) groups.set(key, (g = { words: [], texts: [] }));
+    if (!g) groups.set(key, (g = { words: [], texts: [], refs: new Set(), pure: true }));
     g.words.push(wordBuf);
-    g.texts.push(text);
+    g.texts.push(e.text);
+    for (const r of e.refs || []) {
+      const refBuf = Buffer.from(r, 'utf8');
+      if (refBuf.length && refBuf.length <= MAX_HEADWORD_BYTES) {
+        g.refs.add(foldKey(refBuf).toString('latin1'));
+      }
+    }
+    if (!e.pure) g.pure = false;
   }
+
+  // A pure form-of group with exactly one resolvable lemma becomes an alias:
+  // its .idx rows reuse the lemma's (offset, size) outright, so "cats" shows
+  // cat's definition at zero size cost. StarDict allows shared offsets and the
+  // reader only ever reads one (offset, size) pair per hit. Chains ("runnin'"
+  // -> "running" -> "run") are followed to the material end; a chain that
+  // loops keeps its own stub text instead.
+  const resolveAlias = (key) => {
+    let cur = key;
+    const seen = new Set([key]);
+    for (;;) {
+      const g = groups.get(cur);
+      const refs = [...g.refs].filter((r) => r !== cur && groups.has(r));
+      if (!g.pure || refs.length !== 1) return cur === key ? null : cur;  // material end
+      if (seen.has(refs[0])) return null;  // pure-ref cycle: keep the stub text
+      seen.add(refs[0]);
+      cur = refs[0];
+    }
+  };
+  const aliasOf = new Map();
+  for (const key of groups.keys()) {
+    const target = resolveAlias(key);
+    if (target) aliasOf.set(key, target);
+  }
+
+  // Material groups with refs (mixed entries like "found": own sense plus
+  // past-of-find) append the referenced definitions after their own text.
+  const bodyCache = new Map();
+  const building = new Set();
+  const bodyText = (key) => {
+    const target = aliasOf.get(key) || key;
+    if (bodyCache.has(target)) return bodyCache.get(target);
+    const g = groups.get(target);
+    const own = g.texts.filter(Boolean).join('\n\n');
+    if (building.has(target)) return own;  // ref cycle: stop at own text
+    building.add(target);
+    let text = own;
+    for (const r of g.refs) {
+      if (!groups.has(r) || (aliasOf.get(r) || r) === target) continue;
+      const refText = bodyText(r);
+      if (refText) text += (text ? '\n\n' : '') + refText;
+    }
+    building.delete(target);
+    bodyCache.set(target, text);
+    return text;
+  };
+
   const keys = [...groups.keys()].sort((a, b) =>
     Buffer.compare(Buffer.from(a, 'latin1'), Buffer.from(b, 'latin1')));
 
+  // Lay out material bodies first (aliases contribute no bytes), then emit
+  // .idx rows in sorted order — alias rows borrow their target's placement,
+  // so offsets in the .idx are not monotonic, which StarDict permits.
   const dictParts = [];
-  const idxParts = [];
+  const placed = new Map();  // material key -> {offset, size}
   let offset = 0;
-  let wordCount = 0;
   for (const key of keys) {
-    const g = groups.get(key);
-    let body = Buffer.from(g.texts.join('\n\n'), 'utf8');
+    if (aliasOf.has(key)) continue;
+    let body = Buffer.from(bodyText(key), 'utf8');
     if (body.length > MAX_DEFINITION_BYTES) body = truncateUtf8(body, MAX_DEFINITION_BYTES);
     dictParts.push(body);
-    for (const wordBuf of g.words) {
+    placed.set(key, { offset, size: body.length });
+    offset += body.length;
+  }
+  const idxParts = [];
+  let wordCount = 0;
+  for (const key of keys) {
+    const loc = placed.get(aliasOf.get(key) || key);
+    for (const wordBuf of groups.get(key).words) {
       const row = Buffer.alloc(wordBuf.length + 9);
       wordBuf.copy(row);
-      row.writeUInt32BE(offset, wordBuf.length + 1);
-      row.writeUInt32BE(body.length, wordBuf.length + 5);
+      row.writeUInt32BE(loc.offset, wordBuf.length + 1);
+      row.writeUInt32BE(loc.size, wordBuf.length + 5);
       idxParts.push(row);
       wordCount++;
     }
-    offset += body.length;
   }
   if (offset > 0xffffffff) throw new Error('dict over 4 GB (32-bit offsets)');
 
@@ -234,7 +316,7 @@ async function buildKaikki(src, tmp) {
   const jsonl = join(tmp, src.id + '.jsonl.gz');
   curl(src.url, jsonl);
 
-  const blocks = new Map();  // word -> [ "word (pos)\n1. ...\n2. ...", ... ]
+  const blocks = new Map();  // word -> {texts: ["word (pos)\n1. ..."], refs, pure}
   const rl = createInterface({ input: createReadStream(jsonl).pipe(createGunzip()), crlfDelay: Infinity });
   let lines = 0;
   for await (const line of rl) {
@@ -243,23 +325,43 @@ async function buildKaikki(src, tmp) {
     try { e = JSON.parse(line); } catch (err) { continue; }
     if (!e.word || !Array.isArray(e.senses)) continue;
     const glosses = [];
+    const refs = [];
+    let ownSenses = 0;  // glossed senses that are NOT a form_of/alt_of pointer
     for (const sense of e.senses) {
       const g = Array.isArray(sense.glosses) ? sense.glosses.filter(Boolean).join('; ') : '';
-      if (g) glosses.push(g);
+      let isRef = false;
+      for (const f of [].concat(sense.form_of || [], sense.alt_of || [])) {
+        if (f && typeof f.word === 'string' && f.word && f.word !== e.word) {
+          refs.push(f.word);
+          isRef = true;
+        }
+      }
+      if (g) {
+        glosses.push(g);
+        if (!isRef) ownSenses++;
+      }
       if (glosses.length >= 30) break;
     }
     if (!glosses.length) continue;
     const header = e.word + (e.pos ? ` (${e.pos})` : '');
     const text = header + '\n' + glosses.map((g, i) => `${i + 1}. ${g}`).join('\n');
-    let list = blocks.get(e.word);
-    if (!list) blocks.set(e.word, (list = []));
-    if (list.length < 8) list.push(text);  // cap runaway homographs
+    let rec = blocks.get(e.word);
+    if (!rec) blocks.set(e.word, (rec = { texts: [], refs: new Set(), pure: true }));
+    if (rec.texts.length < 8) rec.texts.push(text);  // cap runaway homographs
+    for (const r of refs) { if (rec.refs.size < 3) rec.refs.add(r); }
+    if (ownSenses > 0) rec.pure = false;
   }
   rmSync(jsonl, { force: true });
   console.log(`  ${lines} lines -> ${blocks.size} headwords`);
 
   const entries = new Map();
-  for (const [word, list] of blocks) entries.set(word, list.join('\n\n'));
+  for (const [word, rec] of blocks) {
+    entries.set(word, {
+      text: rec.texts.join('\n\n'),
+      refs: [...rec.refs],
+      pure: rec.pure && rec.refs.size > 0,
+    });
+  }
   return writeStardict(join(OUT, 'assets'), src.id, src.title, entries);
 }
 
