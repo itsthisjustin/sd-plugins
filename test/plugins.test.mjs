@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import vm from 'node:vm';
+import { createHash } from 'node:crypto';
 
 const root = new URL('../', import.meta.url);
 
@@ -257,21 +258,23 @@ test('dictionaries installs through redirects and sets the active dictionary wit
   assert.equal(saved.fontPointSize, 12);
 });
 
-test('protected content restores content.key, writes rights first, and fulfills without rewriting credentials', async () => {
-  const document = fakeDocument([
-    'lib-account-state', 'lib-user', 'lib-pass', 'lib-go', 'lib-acsm',
-    'lib-refresh', 'lib-fulfill', 'lib-status',
-  ]);
+async function protectedContentFixture(options = {}) {
   const writes = [];
   const downloads = [];
   const deletes = [];
   const fulfillmentOperations = [];
+  const files = new Map();
+  const relayCalls = [];
+  const cryptoCalls = [];
   let savedCredential = '';
+  let randomCounter = 0;
   let activationRedirected = false;
   const crypto = async (op, fields = {}) => {
+    cryptoCalls.push({ op, fields });
+    if (options.pauseCrypto) await options.pauseCrypto;
     const zeros = (length) => btoa(String.fromCharCode(...new Uint8Array(length)));
-    if (op === 'random') return { data: zeros(fields.len) };
-    if (op === 'sha1') return { data: zeros(20) };
+    if (op === 'random') return { data: Buffer.alloc(fields.len, ++randomCounter).toString('base64') };
+    if (op === 'sha1') return { data: createHash('sha1').update(Buffer.from(fields.data, 'base64')).digest('base64') };
     if (op === 'keygen') return { public: 'cHVibGlj', private: 'cHJpdmF0ZQ==' };
     if (op === 'pubencrypt') return { data: zeros(128) };
     if (op === 'aesenc') return { data: zeros(16) };
@@ -280,7 +283,8 @@ test('protected content restores content.key, writes rights first, and fulfills 
     if (op === 'sign') return { data: zeros(128) };
     throw new Error('unexpected crypto op: ' + op);
   };
-  const relay = async (method, url, headers) => {
+  const relay = async (method, url, headers, requestBody) => {
+    relayCalls.push({ method, url, body: requestBody });
     assert.equal(Object.keys(headers).some((name) => name.toLowerCase() === 'user-agent'), false);
     let body;
     if (url.endsWith('/ActivationServiceInfo') && !activationRedirected) {
@@ -290,7 +294,7 @@ test('protected content restores content.key, writes rights first, and fulfills 
         body: '',
         headers: [['location', '/adept/ActivationServiceInfo2']],
       };
-    } else if (url.endsWith('/ActivationServiceInfo2')) {
+    } else if ((url.endsWith('/ActivationServiceInfo2') || url.endsWith('/ActivationServiceInfo'))) {
       body = '<adept:service xmlns:adept="http://ns.adobe.com/adept">' +
         '<adept:authURL>https://adeactivate.adobe.com/adept</adept:authURL>' +
         '<adept:userInfoURL>https://adeactivate.adobe.com/user</adept:userInfoURL>' +
@@ -299,12 +303,16 @@ test('protected content restores content.key, writes rights first, and fulfills 
       body = '<adept:service xmlns:adept="http://ns.adobe.com/adept">' +
         '<adept:certificate>YXV0aC1jZXJ0</adept:certificate></adept:service>';
     } else if (url.endsWith('/SignInDirect')) {
+      if (options.failSignIn) throw new Error('sign-in transport failed');
       body = '<adept:credentials xmlns:adept="http://ns.adobe.com/adept">' +
         '<adept:user>urn:uuid:user</adept:user><adept:pkcs12>cDEy</adept:pkcs12>' +
         '<adept:licenseCertificate>bGljLWNlcnQ=</adept:licenseCertificate>' +
         '<adept:encryptedPrivateLicenseKey>ZW5j</adept:encryptedPrivateLicenseKey>' +
         '</adept:credentials>';
     } else if (url.endsWith('/Activate')) {
+      if (options.activationFailure === 'lost reply') throw new Error('lost reply');
+      if (options.activationFailure === 'reject') return { status: 400, body: '<adept:error data="E_ACT_TOO_MANY_ACTIVATIONS"/>', headers: [] };
+      if (options.activationFailure === 'redirect') return { status: 307, body: '', headers: [['Location', url]] };
       body = '<adept:activationToken xmlns:adept="http://ns.adobe.com/adept">' +
         '<adept:device>urn:uuid:device</adept:device></adept:activationToken>';
     } else if (url.includes('/LicenseServiceInfo?')) {
@@ -331,6 +339,14 @@ test('protected content restores content.key, writes rights first, and fulfills 
     relay,
     async writeFile(path, data) {
       writes.push({ path, data });
+      if (options.failWrite && options.failWrite(path, data)) {
+        if (options.truncateCredential && path === '/.crosspoint/content.key') {
+          savedCredential = 'truncated';
+          files.set(path, savedCredential);
+        }
+        throw new Error('SD write failed');
+      }
+      files.set(path, Buffer.from(data, 'base64').toString('utf8'));
       if (path === '/.crosspoint/content.key') {
         savedCredential = Buffer.from(data, 'base64').toString('utf8');
       } else if (path.endsWith('.rights')) {
@@ -348,19 +364,18 @@ test('protected content restores content.key, writes rights first, and fulfills 
     '<adept:fulfillmentToken xmlns:adept="http://ns.adobe.com/adept">' +
     '<adept:operatorURL>https://fulfill.example.overdrive.com/acs/</adept:operatorURL>' +
     '<adept:hmac>aG1hYw==</adept:hmac></adept:fulfillmentToken>';
-  async function fetch(url, options = {}) {
+  async function fetch(url, request = {}) {
+    if (url === '/api/status') return response({ json: { hardwareMac: options.mac === undefined ? '02:11:22:33:44:55' : options.mac } });
     if (url === '/delete') {
-      assert.equal(options.method, 'POST');
-      assert.equal(options.headers['Content-Type'], 'application/x-www-form-urlencoded');
-      deletes.push(new URLSearchParams(options.body).get('path'));
+      assert.equal(request.method, 'POST');
+      assert.equal(request.headers['Content-Type'], 'application/x-www-form-urlencoded');
+      deletes.push(new URLSearchParams(request.body).get('path'));
       return response();
     }
     if (url.startsWith('/api/files')) {
       const path = new URLSearchParams(url.split('?')[1]).get('path');
       if (path === '/.crosspoint') {
-        return response({ json: savedCredential
-          ? [{ name: 'content.key', isDirectory: false }]
-          : [] });
+        return response({ json: [...files.keys()].filter((path) => path.startsWith('/.crosspoint/')).map((path) => ({ name: path.split('/').pop(), isDirectory: false })) });
       }
       if (path === '/Loans') {
         return response({ json: [{ name: 'library-loan.acsm', isDirectory: false }] });
@@ -369,30 +384,50 @@ test('protected content restores content.key, writes rights first, and fulfills 
     }
     if (url.startsWith('/download')) {
       const path = new URLSearchParams(url.split('?')[1]).get('path');
-      if (path === '/.crosspoint/content.key') return response({ text: savedCredential });
+      if (files.has(path)) return response({ text: files.get(path) });
       if (path === '/Loans/library-loan.acsm') return response({ text: acsm });
     }
     throw new Error('unexpected fetch: ' + url);
   }
 
-  const { render } = await loadPlugin('protected-content/plugin.js', {
-    document,
-    window: { location: { search: '?path=%2FLoans' } },
-    fetch,
-  });
-  await render({ innerHTML: '' }, api);
+  async function loadPage() {
+    const document = fakeDocument([
+      'lib-account-state', 'lib-user', 'lib-pass', 'lib-go', 'lib-acsm',
+      'lib-refresh', 'lib-fulfill', 'lib-status',
+    ]);
+    const { render } = await loadPlugin('protected-content/plugin.js', {
+      document, window: { location: { search: '?path=%2FLoans' } }, fetch,
+    });
+    await render({ innerHTML: '' }, api);
+    return document;
+  }
+  const document = await loadPage();
+  async function activate(doc = document, user = 'reader@example.com', pass = 'secret') {
+    doc.elements['lib-user'].value = user;
+    doc.elements['lib-pass'].value = pass;
+    await doc.elements['lib-go'].onclick();
+  }
+  return { document, loadPage, activate, api, fetch, files, writes, downloads, deletes, fulfillmentOperations,
+    relayCalls, cryptoCalls, credential: () => savedCredential,
+    activationCount: () => relayCalls.filter(({ url }) => url.endsWith('/Activate')).length };
+}
+
+test('protected content restores content.key, writes rights first, and fulfills without rewriting credentials', async () => {
+  const f = await protectedContentFixture();
+  const { document, api, fetch, writes, downloads, deletes, fulfillmentOperations } = f;
   assert.match(document.elements['lib-account-state'].textContent, /No content account/);
   assert.equal(document.elements['lib-acsm'].value, 'library-loan.acsm');
   document.elements['lib-user'].value = 'reader@example.com';
   document.elements['lib-pass'].value = 'secret';
   await document.elements['lib-go'].onclick();
 
-  assert.equal(activationRedirected, true);
+  assert.equal(f.activationCount(), 1);
   assert.equal(document.elements['lib-pass'].value, '');
-  assert.equal(writes[0].path, '/.crosspoint/content.key');
-  assert.match(savedCredential, /^FREEINK-CONTENT-KEY 1/m);
-  assert.match(savedCredential, /^protectedContentState: /m);
-  const credentialAfterActivation = savedCredential;
+  assert.equal(writes.at(-1).path, '/.crosspoint/content.key');
+  assert.equal(writes[0].path, '/.crosspoint/content-activation.json');
+  assert.match(f.credential(), /^FREEINK-CONTENT-KEY 1/m);
+  assert.match(f.credential(), /^protectedContentState: /m);
+  const credentialAfterActivation = f.credential();
 
   // Simulate reopening the File Manager: content.key should restore the
   // signing session, and the uploaded ACSM should be ready without pasting it.
@@ -415,10 +450,221 @@ test('protected content restores content.key, writes rights first, and fulfills 
   assert.equal(downloads[0].url, 'http://download.example.overdrive.com/book.epub');
   assert.equal(downloads[0].dest, '/Loans/Test Book.epub');
   assert.equal(Object.keys(downloads[0].headers).length, 0);
-  assert.equal(writes[1].path, '/Loans/Test Book.epub.rights');
-  assert.equal(writes.length, 2);
+  assert.equal(writes.at(-1).path, '/Loans/Test Book.epub.rights');
+  assert.equal(writes.filter(({path}) => path === '/.crosspoint/content.key').length, 1);
+  assert.equal(f.activationCount(), 1);
   assert.deepEqual(fulfillmentOperations, ['rights', 'download']);
-  assert.equal(savedCredential, credentialAfterActivation);
+  assert.equal(f.credential(), credentialAfterActivation);
   assert.deepEqual(deletes, ['/Loans/library-loan.acsm']);
   assert.match(reloadedDocument.elements['lib-status'].textContent, /Fetched “Test Book”/);
+});
+
+const activationPath = '/.crosspoint/content-activation.json';
+const credentialPath = '/.crosspoint/content.key';
+function checkpoint(f) { return JSON.parse(f.files.get(activationPath)); }
+
+const flatCredential = 'FREEINK-CONTENT-KEY 1\n' + Object.entries({
+  username: 'reader@example.com', devicesalt: 'c2FsdA==',
+  serial: 'saved-serial', fingerprint: 'saved-fingerprint',
+  userUuid: 'urn:uuid:saved-user', deviceUuid: 'urn:uuid:saved-device',
+  activationURL: 'https://adeactivate.adobe.com/adept',
+  authenticationCertificate: 'YXV0aC1jZXJ0', licenseCertificate: 'bGljLWNlcnQ=',
+  privateLicenseKey: 'cHJpdmF0ZQ==',
+  signingKeyPkcs8: 'c2F2ZWQtc2lnbmluZy1rZXk=', signingCertDer: 'c2F2ZWQtY2VydA==',
+}).map(([key, value]) => `${key}: ${value}\n`).join('');
+
+test('flat signing credentials restore and fulfill without signing in, activating, or rewriting the file', async () => {
+  const f = await protectedContentFixture({ mac: '' });
+  f.files.set(credentialPath, flatCredential);
+  const page = await f.loadPage();
+  assert.match(page.elements['lib-account-state'].textContent, /Connected as reader@example.com/);
+  assert.equal(page.elements['lib-fulfill'].disabled, false);
+  await f.activate(page, 'READER@example.com', '');
+  assert.equal(f.relayCalls.length, 0);
+  assert.equal(f.cryptoCalls.length, 0);
+  await page.elements['lib-fulfill'].onclick();
+  assert.equal(f.downloads.length, 1);
+  assert.equal(f.activationCount(), 0);
+  assert.equal(f.relayCalls.some(({ url }) => url.endsWith('/SignInDirect')), false);
+  assert.ok(f.cryptoCalls.filter(({ op }) => op === 'sign').every(
+    ({ fields }) => fields.private === 'c2F2ZWQtc2lnbmluZy1rZXk='));
+  assert.match(f.relayCalls.find(({ url }) => url.endsWith('/Fulfill')).body, /urn:uuid:saved-device/);
+  assert.equal(f.files.get(credentialPath), flatCredential);
+  assert.equal(f.writes.some(({ path }) => path === credentialPath || path === activationPath), false);
+});
+
+for (const credential of [
+  flatCredential.replace(/^signingCertDer:.*\n/m, ''),
+  flatCredential + 'protectedContentState: not-json\n',
+]) {
+  test('damaged saved signing credentials do not suggest another activation', async () => {
+    const f = await protectedContentFixture();
+    f.files.set(credentialPath, credential);
+    const page = await f.loadPage();
+    assert.match(page.elements['lib-account-state'].textContent, /Could not restore/);
+    assert.equal(page.elements['lib-fulfill'].disabled, true);
+    await f.activate(page);
+    assert.equal(f.activationCount(), 0);
+    assert.equal(f.files.get(credentialPath), credential);
+  });
+}
+
+test('activation serial is MAC-derived and existing activation is reused without a password', async () => {
+  const a = await protectedContentFixture();
+  const b = await protectedContentFixture({ mac: '02:11:22:33:44:66' });
+  await a.activate();
+  await b.activate();
+  assert.notEqual(checkpoint(a).session.device.serial, checkpoint(b).session.device.serial);
+  assert.equal(checkpoint(a).session.device.serial,
+    createHash('sha1').update('crosspoint:protected-content:v1:02:11:22:33:44:55').digest('hex'));
+  assert.equal(a.cryptoCalls.some(({ op, fields }) => op === 'random' && fields.len === 20), false);
+  const cryptoCount = a.cryptoCalls.length;
+  const page = await a.loadPage();
+  await a.activate(page, 'READER@example.com', '');
+  assert.equal(a.activationCount(), 1);
+  assert.equal(a.cryptoCalls.length, cryptoCount);
+  assert.match(page.elements['lib-status'].textContent, /already activated/);
+});
+
+for (const reload of [false, true]) for (const truncateCredential of [false, true]) {
+  test(`credential save retry avoids activation (reload=${reload}, truncated=${truncateCredential})`, async () => {
+    const options = { truncateCredential, failWrite: (path) => path === credentialPath };
+    const f = await protectedContentFixture(options);
+    await f.activate();
+    assert.equal(f.activationCount(), 1);
+    const saved = checkpoint(f).session;
+    assert.equal(saved.act.deviceUuid, 'urn:uuid:device');
+    options.failWrite = null;
+    const page = reload ? await f.loadPage() : f.document;
+    await f.activate(page, 'reader@example.com', '');
+    assert.equal(f.activationCount(), 1);
+    assert.equal(checkpoint(f).session.device.fingerprint, saved.device.fingerprint);
+    assert.match(f.credential(), /^FREEINK-CONTENT-KEY 1/);
+    assert.match(page.elements['lib-status'].textContent, /Activation saved/);
+  });
+}
+
+for (const failedWrite of [1, 2, 3]) {
+  test(`checkpoint write ${failedWrite} failure does not replay a successful activation`, async () => {
+    let writes = 0;
+    const options = { failWrite: (path) => path === activationPath && ++writes === failedWrite };
+    const f = await protectedContentFixture(options);
+    await f.activate();
+    assert.equal(f.activationCount(), failedWrite === 3 ? 1 : 0);
+    options.failWrite = null;
+    await f.activate();
+    assert.equal(f.activationCount(), 1);
+    assert.match(f.credential(), /^FREEINK-CONTENT-KEY 1/);
+  });
+}
+
+test('sign-in failure and page reload retain the MAC identity and random salt', async () => {
+  const options = { failSignIn: true };
+  const f = await protectedContentFixture(options);
+  await f.activate();
+  assert.equal(f.activationCount(), 0);
+  const identity = checkpoint(f).session;
+  options.failSignIn = false;
+  await f.activate(await f.loadPage());
+  assert.equal(f.activationCount(), 1);
+  assert.deepEqual(checkpoint(f).session.device, identity.device);
+  assert.equal(checkpoint(f).session.salt, identity.salt);
+});
+
+for (const activationFailure of ['lost reply', 'redirect']) {
+  test(`${activationFailure} stops activation replay across retries and reloads`, async () => {
+    const options = { activationFailure };
+    const f = await protectedContentFixture(options);
+    await f.activate();
+    assert.equal(f.activationCount(), 1);
+    options.activationFailure = null;
+    await f.activate();
+    const page = await f.loadPage();
+    await f.activate(page);
+    assert.equal(f.activationCount(), 1);
+    assert.match(page.elements['lib-status'].textContent, /no saved reply/);
+  });
+}
+
+test('explicit service rejection permits retry using the same identity', async () => {
+  const options = { activationFailure: 'reject' };
+  const f = await protectedContentFixture(options);
+  await f.activate();
+  const identity = checkpoint(f).session.device;
+  options.activationFailure = null;
+  await f.activate(await f.loadPage());
+  assert.equal(f.activationCount(), 2);
+  assert.deepEqual(checkpoint(f).session.device, identity);
+});
+
+test('duplicate handler calls cannot start concurrent activation sequences', async () => {
+  let resume;
+  const options = { pauseCrypto: new Promise((resolve) => { resume = resolve; }) };
+  const f = await protectedContentFixture(options);
+  const first = f.activate();
+  const duplicate = f.document.elements['lib-go'].onclick();
+  resume();
+  await Promise.all([first, duplicate]);
+  assert.equal(f.activationCount(), 1);
+});
+
+test('legacy credential upgrade preserves its identity', async () => {
+  const f = await protectedContentFixture();
+  f.files.set(credentialPath, 'FREEINK-CONTENT-KEY 1\nusername: reader@example.com\n' +
+    'serial: legacy-serial\nfingerprint: legacy-fingerprint\ndevicesalt: bGVnYWN5\n');
+  await f.activate(await f.loadPage());
+  assert.equal(f.activationCount(), 1);
+  assert.equal(checkpoint(f).session.device.serial, 'legacy-serial');
+  assert.equal(checkpoint(f).session.device.fingerprint, 'legacy-fingerprint');
+  assert.equal(checkpoint(f).session.salt, 'bGVnYWN5');
+});
+
+for (const mac of ['', 'not-a-mac']) {
+  test(`missing or invalid hardware identity blocks activation: ${mac}`, async () => {
+    const f = await protectedContentFixture({ mac });
+    await f.activate();
+    assert.equal(f.activationCount(), 0);
+    assert.equal(f.cryptoCalls.length, 0);
+    assert.match(f.document.elements['lib-status'].textContent, /factory MAC/);
+  });
+}
+
+test('damaged checkpoint is not discarded to create a new activation', async () => {
+  const f = await protectedContentFixture();
+  f.files.set(activationPath, '{"version":1}');
+  await f.activate(await f.loadPage());
+  assert.equal(f.activationCount(), 0);
+  assert.equal(f.files.get(activationPath), '{"version":1}');
+});
+
+test('account replacement keeps the existing device identity', async () => {
+  const f = await protectedContentFixture();
+  await f.activate();
+  const first = checkpoint(f).session;
+  await f.activate(await f.loadPage(), 'other@example.com');
+  assert.equal(f.activationCount(), 2);
+  assert.deepEqual(checkpoint(f).session.device, first.device);
+  assert.equal(checkpoint(f).session.salt, first.salt);
+});
+
+test('existing activation works on firmware without the new MAC field', async () => {
+  const options = {};
+  const f = await protectedContentFixture(options);
+  await f.activate();
+  options.mac = '';
+  await f.activate(await f.loadPage(), 'reader@example.com', '');
+  assert.equal(f.activationCount(), 1);
+});
+
+test('lost checkpoint after activation cannot silently reactivate after reload', async () => {
+  let writes = 0;
+  const options = { failWrite: (path) => path === activationPath && ++writes === 3 };
+  const f = await protectedContentFixture(options);
+  await f.activate();
+  assert.equal(f.activationCount(), 1);
+  options.failWrite = null;
+  const page = await f.loadPage();
+  await f.activate(page);
+  assert.equal(f.activationCount(), 1);
+  assert.match(page.elements['lib-status'].textContent, /no saved reply/);
 });

@@ -18,7 +18,7 @@ online.
 
 ## Connect your account (once)
 
-1. Open the device web page → **Settings** → the **Protected Content** card.
+1. Open the device web page → **File Manager** → the **Protected Content** card.
 2. Enter your account **email** and **password** and tap **Activate device**.
    This links the reader to your account and saves a credential to the SD card.
    You only do this once.
@@ -46,3 +46,24 @@ online.
 - Borrowed books stop opening once the loan period ends.
 - Your account credential is stored on the SD card, so keep the card somewhere
   safe.
+
+
+### Activation identity and recovery
+
+New activations require firmware exposing `hardwareMac` in `/api/status`. The
+plugin derives the device serial from that factory MAC. The random salt and
+keys are saved on SD; existing credentials keep their original identity.
+Reopening the page or selecting the same account reuses its saved activation.
+
+`/.crosspoint/content-activation.json` checkpoints setup before the activation
+request. If saving `content.key` fails after a successful activation, use
+**Save activation** to retry the SD write without registering again. Keep the
+page open if the checkpoint write also failed. A saved checkpoint can recover
+the activation after a page reload. Back up both files together; they contain
+private account credentials.
+
+If an activation request has no saved reply, the plugin stops rather than
+submitting it again. It also does not replay activation POSTs on redirects.
+Contact the provider to resolve that attempt before retrying; deleting the
+checkpoint or creating another identity could consume another slot. This
+change does not recover slots already consumed on the provider's server.

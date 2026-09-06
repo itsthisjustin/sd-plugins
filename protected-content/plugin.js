@@ -9,12 +9,16 @@ CrossPoint.registerPlugin(async (container, api) => {
   const ACS = 'https://adeactivate.adobe.com/adept';
   const ADEPT_CT = 'application/vnd.adobe.adept+xml';
   const CREDENTIAL_PATH = '/.crosspoint/content.key';
+  const ACTIVATION_PATH = '/.crosspoint/content-activation.json';
   const HOBBES = '10.0.4';
   const currentFolder = new URLSearchParams(window.location.search).get('path') || '/';
 
   // Everything the activate + fulfill flow needs. It is persisted as an
   // SDK-ignored field in content.key so uploaded ACSMs also work after reload.
   let session = null; // { salt, device, act }
+  let activation = null;
+  let activating = false;
+  let initialized = false;
 
   // ======================================================================== //
   // device capability wrappers
@@ -65,8 +69,9 @@ CrossPoint.registerPlugin(async (container, api) => {
     }
     return r; // { status, body }
   }
-  async function sendAdept(url, doc) {
-    const r = await relayFollow('POST', url,
+  async function sendAdept(url, doc, followRedirects = true) {
+    const send = followRedirects ? relayFollow : (...args) => api.relay(...args);
+    const r = await send('POST', url,
       { 'Content-Type': ADEPT_CT }, serialize(doc));
     if (r.error) throw new Error('relay: ' + r.error);
     let root;
@@ -79,7 +84,9 @@ CrossPoint.registerPlugin(async (container, api) => {
       throw e;
     }
     if (root.name === 'error' || root.name.endsWith(':error')) {
-      throw new Error(root.attrs.data || ('ACS error (HTTP ' + r.status + ')'));
+      const error = new Error(root.attrs.data || ('ACS error (HTTP ' + r.status + ')'));
+      error.adeptRejected = true;
+      throw error;
     }
     if (r.status < 200 || r.status >= 300) {
       throw new Error('HTTP ' + r.status + ' from ' + url);
@@ -351,13 +358,19 @@ CrossPoint.registerPlugin(async (container, api) => {
   // ======================================================================== //
   // 1. identity  2. bootstrap  3. sign-in  4. activate  — ported from client.ts
   // ======================================================================== //
-  async function makeIdentity() {
-    const salt = (await dcrypto('random', { len: 16 })).data;
-    const serialBytes = b64ToBytes((await dcrypto('sha1', { data: (await dcrypto('random', { len: 20 })).data })).data);
-    const serial = [...serialBytes].map((x) => x.toString(16).padStart(2, '0')).join('');
+  async function makeIdentity(mac, legacy = {}) {
+    if ((legacy.serial || legacy.fingerprint || legacy.devicesalt) &&
+        !(legacy.serial && legacy.fingerprint && legacy.devicesalt)) {
+      throw new Error('The saved device identity is incomplete. Restore its backup before activating.');
+    }
+    const salt = legacy.devicesalt || (await dcrypto('random', { len: 16 })).data;
+    const serialBytes = b64ToBytes((await dcrypto('sha1', {
+      data: utf8ToB64('crosspoint:protected-content:v1:' + mac),
+    })).data);
+    const serial = legacy.serial || [...serialBytes].map((x) => x.toString(16).padStart(2, '0')).join('');
     // fingerprint = base64(sha1(utf8(serial) || salt))
     const fpInput = bytesToB64(concatBytes([te.encode(serial), b64ToBytes(salt)]));
-    const fingerprint = (await dcrypto('sha1', { data: fpInput })).data;
+    const fingerprint = legacy.fingerprint || (await dcrypto('sha1', { data: fpInput })).data;
     return {
       salt,
       device: {
@@ -449,7 +462,11 @@ CrossPoint.registerPlugin(async (container, api) => {
     reqDoc.children.push(textEl('adept:user', act.userUuid));
     await signNode(reqDoc);
 
-    const token = await sendAdept(act.activationURL + '/Activate', reqDoc);
+    // Persist intent before sending: a lost reply must not trigger another activation.
+    activation.phase = 'requested';
+    try { await saveActivation(); }
+    catch (e) { activation.phase = 'identity'; throw e; }
+    const token = await sendAdept(act.activationURL + '/Activate', reqDoc, false);
     act.deviceUuid = req(find(token, 'device'), 'device (activation token)');
   }
 
@@ -698,9 +715,21 @@ CrossPoint.registerPlugin(async (container, api) => {
   }
 
   function restorePluginSession(fields) {
-    if (!fields.protectedContentState) return null;
-    const saved = JSON.parse(b64ToUtf8(fields.protectedContentState));
-    const restored = saved && saved.version === 1 ? saved.session : null;
+    let restored;
+    if (fields.protectedContentState) {
+      const saved = JSON.parse(b64ToUtf8(fields.protectedContentState));
+      restored = saved && saved.version === 1 ? saved.session : null;
+    } else if (fields.signingKeyPkcs8 || fields.signingCertDer) {
+      restored = {
+        salt: fields.devicesalt,
+        device: {
+          serial: fields.serial, fingerprint: fields.fingerprint,
+          deviceClass: 'Desktop', deviceType: 'standalone', deviceName: 'browser',
+          hobbes: HOBBES, clientOS: 'Linux', clientLocale: 'en_US',
+        },
+        act: { ...fields, signingKey: fields.signingKeyPkcs8, signingCert: fields.signingCertDer },
+      };
+    } else return null;
     if (!restored || !restored.salt || !restored.device || !restored.act ||
         !restored.device.serial || !restored.device.fingerprint ||
         !restored.act.userUuid || !restored.act.deviceUuid ||
@@ -712,15 +741,66 @@ CrossPoint.registerPlugin(async (container, api) => {
     return restored;
   }
 
-  async function loadCredentialFromSd() {
+  async function readAccountFile(path) {
     const listing = await fetch('/api/files?path=' + encodeURIComponent('/.crosspoint'));
     if (!listing.ok) throw new Error('could not inspect the credential folder (HTTP ' + listing.status + ')');
     const entries = await listing.json();
-    const exists = entries.some((entry) => !entry.isDirectory && entry.name === 'content.key');
-    if (!exists) return null;
-    const response = await fetch('/download?path=' + encodeURIComponent(CREDENTIAL_PATH));
-    if (!response.ok) throw new Error('could not read content.key (HTTP ' + response.status + ')');
-    return parseCredential(await response.text());
+    if (!entries.some((entry) => !entry.isDirectory && entry.name === path.split('/').pop())) return null;
+    const response = await fetch('/download?path=' + encodeURIComponent(path));
+    if (!response.ok) throw new Error('could not read ' + path + ' (HTTP ' + response.status + ')');
+    return response.text();
+  }
+
+  async function loadCredentialFromSd() {
+    const text = await readAccountFile(CREDENTIAL_PATH);
+    return text === null ? null : parseCredential(text);
+  }
+
+  async function saveActivation() {
+    const write = await api.writeFile(ACTIVATION_PATH, utf8ToB64(JSON.stringify(activation)));
+    if (!write.ok) throw new Error('could not save activation progress to SD');
+  }
+
+  function sameAccount(a, b) { return String(a || '').trim().toLowerCase() === b.trim().toLowerCase(); }
+
+  async function loadActivation() {
+    if (!activation) {
+      const text = await readAccountFile(ACTIVATION_PATH);
+      if (text !== null) {
+        activation = JSON.parse(text);
+        if (activation?.version !== 1 || !['identity', 'requested'].includes(activation.phase) ||
+            !activation.hardwareMac || !activation.account || !activation.session?.salt ||
+            !activation.session.device?.serial || !activation.session.device?.fingerprint ||
+            (activation.session.act?.deviceUuid && (!activation.session.act.userUuid ||
+              !activation.session.act.signingKey || !activation.session.act.signingCert ||
+              !activation.session.act.privateLicenseKey))) {
+          activation = null;
+          throw new Error('Saved activation progress is damaged. Restore its backup before activating.');
+        }
+      }
+    }
+  }
+
+  async function prepareActivation(user, fields) {
+    const response = await fetch('/api/status');
+    if (!response.ok) throw new Error('could not read the reader identity');
+    const mac = String((await response.json()).hardwareMac || '').toLowerCase();
+    if (!/^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$/.test(mac)) {
+      throw new Error('Update the reader firmware: a factory MAC address is required for activation.');
+    }
+    await loadActivation();
+    if (activation && activation.hardwareMac !== mac) {
+      throw new Error('Saved activation progress belongs to another reader. Resume it on that reader.');
+    }
+    if (activation?.phase === 'requested' && !activation.session.act?.deviceUuid) {
+      throw new Error('The previous activation has no saved reply. Another request could use another device slot; contact the provider before retrying.');
+    }
+    if (!activation || !sameAccount(activation.account, user)) {
+      const identity = activation?.session || session || await makeIdentity(mac, fields || {});
+      activation = { version: 1, hardwareMac: mac, account: user, phase: 'identity',
+        session: { salt: identity.salt, device: identity.device, act: null } };
+    }
+    session = activation.session;
   }
 
   function folderPath(name) {
@@ -759,7 +839,7 @@ CrossPoint.registerPlugin(async (container, api) => {
   function updateFulfillButton() {
     const select = document.getElementById('lib-acsm');
     document.getElementById('lib-fulfill').disabled =
-      !session || !select || select.disabled || !select.value;
+      activating || !session?.act?.deviceUuid || !select || select.disabled || !select.value;
   }
 
   function escapeHtml(value) {
@@ -793,7 +873,7 @@ CrossPoint.registerPlugin(async (container, api) => {
     '<div class="setting-row"><label class="setting-name" for="lib-pass">Password</label>' +
     '<span class="setting-control"><input id="lib-pass" name="password" type="password" autocomplete="current-password"></span></div>' +
     '<div style="margin-top:12px;text-align:center;">' +
-    '<button type="button" class="btn-small" id="lib-go">Activate device</button></div>' +
+    '<button type="button" class="btn-small" id="lib-go" disabled>Activate device</button></div>' +
     '<hr style="margin:16px 0;border:none;border-top:1px solid var(--border-color,#ddd)">' +
     '<label class="setting-name" for="lib-acsm" style="display:block;margin-bottom:6px;">Uploaded authorization file</label>' +
     '<p style="color:var(--label-color);font-size:0.85em;margin:0 0 8px;">' +
@@ -810,27 +890,45 @@ CrossPoint.registerPlugin(async (container, api) => {
   async function initialize() {
     const accountState = document.getElementById('lib-account-state');
     try {
-      const fields = await loadCredentialFromSd();
+      let fields;
+      try { fields = await loadCredentialFromSd(); }
+      catch (e) {
+        await loadActivation();
+        if (!activation?.session.act?.deviceUuid) throw e;
+      }
       if (!fields) {
         accountState.textContent = 'No content account found on this SD card.';
       } else {
         document.getElementById('lib-user').value = fields.username || '';
         try {
           session = restorePluginSession(fields);
-          accountState.textContent = 'Connected' +
-            (fields.username ? ' as ' + fields.username : '') + ' — content.key found on the SD card.';
-          document.getElementById('lib-go').textContent = 'Replace account';
+          if (session) {
+            accountState.textContent = 'Connected' +
+              (fields.username ? ' as ' + fields.username : '') + ' — content.key found on the SD card.';
+            document.getElementById('lib-go').textContent = 'Replace account';
+          } else {
+            accountState.textContent = 'content.key can open existing books, but lacks the saved signing credentials needed to fetch new content. Restore a full credential backup to reuse its activation.';
+          }
         } catch (e) {
-          accountState.textContent = 'content.key found' +
-            (fields.username ? ' for ' + fields.username : '') +
-            ', but it predates saved fulfillment sessions. Activate once to upgrade it.';
+          accountState.textContent = 'Could not restore the saved fulfillment session: ' + e.message;
         }
       }
+      if (!session) {
+        await loadActivation();
+        if (activation?.session.act?.deviceUuid) {
+          session = activation.session;
+          document.getElementById('lib-user').value = activation.account;
+          document.getElementById('lib-go').textContent = 'Save activation';
+          accountState.textContent = 'Activation recovered from SD. Save it to finish setup without activating again.';
+        }
+      }
+      initialized = true;
       await refreshAcsmFiles();
     } catch (e) {
       accountState.textContent = 'Could not check account state: ' + e.message;
       try { await refreshAcsmFiles(); } catch (refreshError) { status('Error: ' + refreshError.message); }
     }
+    document.getElementById('lib-go').disabled = !initialized;
     updateFulfillButton();
   }
 
@@ -849,40 +947,62 @@ CrossPoint.registerPlugin(async (container, api) => {
   };
 
   document.getElementById('lib-go').onclick = async () => {
+    if (activating || !initialized) return;
     const user = document.getElementById('lib-user').value.trim();
     const pass = document.getElementById('lib-pass').value;
-    if (!user || !pass) { status('Enter your account ID and password.'); return; }
+    if (!user) { status('Enter your account ID.'); return; }
     const btn = document.getElementById('lib-go');
-    const fulfillBtn = document.getElementById('lib-fulfill');
+    activating = true;
     btn.disabled = true;
-    fulfillBtn.disabled = true;
-    session = null;
+    document.getElementById('lib-fulfill').disabled = true;
     try {
-      status('Preparing device identity…');
-      const id = await makeIdentity();
-      session = { salt: id.salt, device: id.device, act: null };
-      status('Contacting activation server…');
-      session.act = await bootstrap();
-      await signIn(user, pass);
-      await activateDevice();
+      const saveOnly = activation?.session.act?.deviceUuid && sameAccount(activation.account, user);
+      const fields = saveOnly ? null : await loadCredentialFromSd();
+      const saved = fields && restorePluginSession(fields);
+      if (saved && sameAccount(saved.act.username || fields.username, user)) {
+        session = saved;
+        document.getElementById('lib-account-state').textContent = 'Connected as ' + (saved.act.username || user) + '.';
+        btn.textContent = 'Replace account';
+        status('This reader is already activated for this account. Reusing its saved activation.');
+        return;
+      }
+      // Keep an existing identity when changing accounts or upgrading a legacy credential.
+      if (!activation && saved) session = saved;
+      if (saveOnly) session = activation.session;
+      else await prepareActivation(user, fields);
+      if (!session.act?.deviceUuid) {
+        if (!pass) throw new Error('Enter your password to activate this account.');
+        await saveActivation();
+        status('Contacting activation server…');
+        session.act = await bootstrap();
+        await signIn(user, pass);
+        await activateDevice();
+      }
+      await saveActivation();
       await writeCredential();
       document.getElementById('lib-account-state').textContent =
         'Connected as ' + session.act.username + ' — content.key found on the SD card.';
-      document.getElementById('lib-go').textContent = 'Replace account';
-      status('Device activated as ' + session.act.userUuid + '.\n' +
-        'Credential written to ' + CREDENTIAL_PATH + '. You can now fetch uploaded content below.');
-      updateFulfillButton();
+      btn.textContent = 'Replace account';
+      status('Activation saved. You can now fetch uploaded content below.');
     } catch (e) {
-      session = null;
-      status('Error: ' + e.message);
+      if (e.adeptRejected && activation) {
+        activation.phase = 'identity';
+        try { await saveActivation(); } catch (ignored) {}
+      }
+      const saveOnly = activation?.session.act?.deviceUuid && sameAccount(activation.account, user);
+      if (saveOnly) btn.textContent = 'Save activation';
+      status('Error: ' + e.message + (saveOnly
+        ? '\nKeep this page open and retry Save activation; it will not register the device again.' : ''));
     } finally {
       document.getElementById('lib-pass').value = '';
+      activating = false;
       btn.disabled = false;
+      updateFulfillButton();
     }
   };
 
   document.getElementById('lib-fulfill').onclick = async () => {
-    if (!session || !session.act || !session.act.deviceUuid) { status('Activate the device first.'); return; }
+    if (activating || !session || !session.act || !session.act.deviceUuid) { status('Activate the device first.'); return; }
     const selected = document.getElementById('lib-acsm').value;
     if (!selected) { status('Upload and select an .acsm file first.'); return; }
     const btn = document.getElementById('lib-fulfill');
@@ -918,7 +1038,7 @@ CrossPoint.registerPlugin(async (container, api) => {
     api.registerAction('fulfill', async (args) => {
       const path = String((args && args.path) || '');
       if (!path.startsWith('/')) throw new Error('args.path must be an absolute .acsm path');
-      if (!session || !session.act || !session.act.deviceUuid) {
+      if (activating || !session || !session.act || !session.act.deviceUuid) {
         throw new Error('device not activated; open the plugin UI once to sign in');
       }
       const acsmResponse = await fetch('/download?path=' + encodeURIComponent(path));
@@ -957,7 +1077,7 @@ CrossPoint.registerPlugin(async (container, api) => {
       const acsm = String((args && args.acsm) || '');
       if (!book.startsWith('/')) throw new Error('args.book must be an absolute .epub path');
       if (!acsm.startsWith('/')) throw new Error('args.acsm must be an absolute .acsm path');
-      if (!session || !session.act || !session.act.deviceUuid) {
+      if (activating || !session || !session.act || !session.act.deviceUuid) {
         throw new Error('device not activated; open the plugin UI once to sign in');
       }
       const acsmResponse = await fetch('/download?path=' + encodeURIComponent(acsm));

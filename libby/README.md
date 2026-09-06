@@ -1,8 +1,8 @@
 # Libby (for CrossPoint)
 
 Link your Libby (OverDrive) account, view your library loans, and send them to
-the device as EPUBs. Renewing and returning are Libby operations too. This is a
-web-only plugin: run it from `crosspoint.local` in a browser.
+the device as EPUBs. Renewing and returning are Libby operations too. Fetch
+Libby books via the web interface: open `crosspoint.local` in a browser.
 
 ## Requires the Protected Content plugin
 

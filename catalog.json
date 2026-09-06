@@ -73,7 +73,7 @@
       "title": "Protected Content",
       "description": "Fulfill protected content from an online provider.",
       "author": "Diirge",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/protected-content/",
       "files": [
         "manifest.json",
@@ -112,7 +112,7 @@
     {
       "name": "libby",
       "title": "Libby",
-      "description": "Link Libby, view your loans, and fulfill them to the device (ebooks). Requires Protected Content.",
+      "description": "Fetch Libby books via the web interface. Requires Protected Content.",
       "author": "Diirge",
       "version": "0.2.0",
       "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/libby/",
