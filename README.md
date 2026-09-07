@@ -88,9 +88,9 @@ Reconnect to the device web UI; the plugin's card appears on its page. A
 
 ### Protected Content example limitations
 
-- Credentials created by an older plugin version are detected, but need one
-  reactivation to add the persisted fulfillment session. The reader ignores
-  those additional forward-compatible fields.
+- Existing credentials with saved signing keys are reused, including the older
+  flat credential format. Interrupted activation attempts have a deliberate
+  retry flow; see [activation troubleshooting](protected-content/README.md#activation-troubleshooting).
 - The final EPUB download URL must return the file directly. The device streams
   that response to SD and does not currently follow a redirect from `/api/fetch`.
 - The smoke suite exercises the complete protocol shape with mocked services;

@@ -62,8 +62,57 @@ page open if the checkpoint write also failed. A saved checkpoint can recover
 the activation after a page reload. Back up both files together; they contain
 private account credentials.
 
-If an activation request has no saved reply, the plugin stops rather than
-submitting it again. It also does not replay activation POSTs on redirects.
-Contact the provider to resolve that attempt before retrying; deleting the
-checkpoint or creating another identity could consume another slot. This
-change does not recover slots already consumed on the provider's server.
+## Activation troubleshooting
+
+### “The previous activation has no saved reply”
+
+This means setup saved an attempt before sending it, but did not save a
+successful activation response. A connection failure, an unreadable response,
+or a failed SD write can leave this state. It does **not** establish whether
+the service accepted the request or counted an activation slot.
+
+Plugin **1.0.4** adds recovery for this state, including attempts saved by
+1.0.3. Install the updated plugin and refresh the File Manager page. No
+firmware update is needed if activation already worked with 1.0.3.
+
+1. Reconnect the reader using **File Transfer → Join Network**, with internet
+   access, then open **File Manager → Protected Content**.
+2. The card shows **Retry activation**, the pending account, and the last error
+   if one was saved. Older attempts may have no original error available.
+3. If you have a complete credential backup from a successful activation,
+   restore `/.crosspoint/content.key` and refresh to reuse it without another
+   activation request.
+4. Otherwise, choose **Retry activation** for the displayed account. Read the
+   confirmation: the service may count another slot if the first request
+   succeeded. **Cancel** keeps setup paused and sends nothing. Confirming sends
+   one activation request using the saved identity and signing credentials;
+   you do not need to re-enter the password.
+5. If the retry succeeds, setup saves the credential and shows **Connected**.
+   If it fails, the error remains visible and the plugin does not retry
+   automatically. Another attempt requires another confirmation.
+
+Do not delete `content.key` or `content-activation.json` to clear this message.
+They preserve the existing identity and any recoverable activation. The MAC
+address alone cannot reconstruct the saved random keys or a missing activation
+ID, and using the same identity does not guarantee that the service will reuse
+a slot. The plugin also does not replay activation POSTs on redirects.
+
+### “Save activation” or an SD write error
+
+If setup received the activation ID but could not finish saving, keep the page
+open and choose **Save activation**. This only retries the SD writes; it does
+not activate again. A successfully saved checkpoint can also recover this
+state after a page reload. Check the card's free space and write access if
+saving continues to fail.
+
+### Account rejection or activation limit
+
+A service rejection is shown as its error code. Correct a sign-in error before
+retrying. For an exhausted activation limit (such as
+`E_ACT_TOO_MANY_ACTIVATIONS`), contact the account provider to resolve the limit;
+repeated attempts and reinstalling the plugin cannot recover consumed slots.
+
+When reporting a failure, copy the **Last error** text, plugin and firmware
+versions, and whether the reader was in Join Network mode. Do not post either
+account file: both contain private credentials. The plugin help link opens
+this troubleshooting guide.

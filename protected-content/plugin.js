@@ -463,11 +463,21 @@ CrossPoint.registerPlugin(async (container, api) => {
     await signNode(reqDoc);
 
     // Persist intent before sending: a lost reply must not trigger another activation.
+    const previousPhase = activation.phase;
     activation.phase = 'requested';
     try { await saveActivation(); }
-    catch (e) { activation.phase = 'identity'; throw e; }
-    const token = await sendAdept(act.activationURL + '/Activate', reqDoc, false);
-    act.deviceUuid = req(find(token, 'device'), 'device (activation token)');
+    catch (e) { activation.phase = previousPhase; throw e; }
+    try {
+      const token = await sendAdept(act.activationURL + '/Activate', reqDoc, false);
+      act.deviceUuid = req(find(token, 'device'), 'device (activation token)');
+      delete activation.lastError;
+    } catch (e) {
+      if (e.adeptRejected) activation.phase = 'identity';
+      activation.lastError = String(e.message || e).slice(0, 300);
+      try { await saveActivation(); }
+      catch (writeError) { e.message += '\nCould not save the error to SD. Keep this page open to retain the details.'; }
+      throw e;
+    }
   }
 
   // ======================================================================== //
@@ -763,6 +773,18 @@ CrossPoint.registerPlugin(async (container, api) => {
 
   function sameAccount(a, b) { return String(a || '').trim().toLowerCase() === b.trim().toLowerCase(); }
 
+  function activationPending() {
+    return activation?.phase === 'requested' && !activation.session.act?.deviceUuid;
+  }
+
+  function activationRecoveryMessage() {
+    return 'The previous activation has no saved reply, so its outcome is unknown. Automatic retries are paused.\n' +
+      (activation.lastError ? 'Last error: ' + activation.lastError : 'The original error was not saved by this plugin version.') +
+      '\nReconnect using Join Network, then choose Retry activation for ' + activation.account +
+      '. It reuses the saved device identity and credentials, but the service may count another activation slot. ' +
+      'You can cancel, or restore a complete credential backup instead. Do not delete your account files.';
+  }
+
   async function loadActivation() {
     if (!activation) {
       const text = await readAccountFile(ACTIVATION_PATH);
@@ -771,7 +793,7 @@ CrossPoint.registerPlugin(async (container, api) => {
         if (activation?.version !== 1 || !['identity', 'requested'].includes(activation.phase) ||
             !activation.hardwareMac || !activation.account || !activation.session?.salt ||
             !activation.session.device?.serial || !activation.session.device?.fingerprint ||
-            (activation.session.act?.deviceUuid && (!activation.session.act.userUuid ||
+            ((activation.phase === 'requested' || activation.session.act?.deviceUuid) && (!activation.session.act?.userUuid ||
               !activation.session.act.signingKey || !activation.session.act.signingCert ||
               !activation.session.act.privateLicenseKey))) {
           activation = null;
@@ -792,8 +814,14 @@ CrossPoint.registerPlugin(async (container, api) => {
     if (activation && activation.hardwareMac !== mac) {
       throw new Error('Saved activation progress belongs to another reader. Resume it on that reader.');
     }
-    if (activation?.phase === 'requested' && !activation.session.act?.deviceUuid) {
-      throw new Error('The previous activation has no saved reply. Another request could use another device slot; contact the provider before retrying.');
+    if (activationPending()) {
+      if (!sameAccount(activation.account, user)) {
+        throw new Error('An activation is pending for ' + activation.account + '. Retry that account first, or restore a complete credential backup.');
+      }
+      status(activationRecoveryMessage());
+      if (!window.confirm('Retry activation for ' + activation.account + '?\n\n' +
+          'The previous request may have succeeded. This sends one more request using the saved device identity and signing credentials. ' +
+          'The service may count another activation slot. Cancel to keep the attempt paused.')) return false;
     }
     if (!activation || !sameAccount(activation.account, user)) {
       const identity = activation?.session || session || await makeIdentity(mac, fields || {});
@@ -801,6 +829,7 @@ CrossPoint.registerPlugin(async (container, api) => {
         session: { salt: identity.salt, device: identity.device, act: null } };
     }
     session = activation.session;
+    return true;
   }
 
   function folderPath(name) {
@@ -866,7 +895,7 @@ CrossPoint.registerPlugin(async (container, api) => {
     'padding:8px 10px;border:1px solid var(--border-color,#ddd);border-radius:4px;">' +
     '<strong>Network required:</strong> Device activation and book fetching only work when ' +
     'File Transfer is started in <strong>Join Network</strong> mode, not Hotspot mode.</p>' +
-    '<div id="lib-account-state" style="margin-bottom:12px;color:var(--label-color);font-size:0.9em;">' +
+    '<div id="lib-account-state" style="margin-bottom:12px;color:var(--label-color);font-size:0.9em;white-space:pre-line;">' +
     'Checking the SD card for an existing account…</div>' +
     '<div class="setting-row"><label class="setting-name" for="lib-user">Account ID</label>' +
     '<span class="setting-control"><input id="lib-user" name="account-id" type="text" autocomplete="username" placeholder="email"></span></div>' +
@@ -874,6 +903,8 @@ CrossPoint.registerPlugin(async (container, api) => {
     '<span class="setting-control"><input id="lib-pass" name="password" type="password" autocomplete="current-password"></span></div>' +
     '<div style="margin-top:12px;text-align:center;">' +
     '<button type="button" class="btn-small" id="lib-go" disabled>Activate device</button></div>' +
+    '<p style="font-size:0.85em;"><a href="https://github.com/itsthisjustin/sd-plugins/blob/main/protected-content/README.md#activation-troubleshooting" ' +
+    'target="_blank" rel="noopener noreferrer">Activation troubleshooting and recovery</a></p>' +
     '<hr style="margin:16px 0;border:none;border-top:1px solid var(--border-color,#ddd)">' +
     '<label class="setting-name" for="lib-acsm" style="display:block;margin-bottom:6px;">Uploaded authorization file</label>' +
     '<p style="color:var(--label-color);font-size:0.85em;margin:0 0 8px;">' +
@@ -920,6 +951,10 @@ CrossPoint.registerPlugin(async (container, api) => {
           document.getElementById('lib-user').value = activation.account;
           document.getElementById('lib-go').textContent = 'Save activation';
           accountState.textContent = 'Activation recovered from SD. Save it to finish setup without activating again.';
+        } else if (activationPending()) {
+          document.getElementById('lib-user').value = activation.account;
+          document.getElementById('lib-go').textContent = 'Retry activation';
+          accountState.textContent = activationRecoveryMessage();
         }
       }
       initialized = true;
@@ -969,13 +1004,15 @@ CrossPoint.registerPlugin(async (container, api) => {
       // Keep an existing identity when changing accounts or upgrading a legacy credential.
       if (!activation && saved) session = saved;
       if (saveOnly) session = activation.session;
-      else await prepareActivation(user, fields);
+      else if (!(await prepareActivation(user, fields))) return;
       if (!session.act?.deviceUuid) {
-        if (!pass) throw new Error('Enter your password to activate this account.');
-        await saveActivation();
-        status('Contacting activation server…');
-        session.act = await bootstrap();
-        await signIn(user, pass);
+        if (!activationPending()) {
+          if (!pass) throw new Error('Enter your password to activate this account.');
+          await saveActivation();
+          status('Contacting activation server…');
+          session.act = await bootstrap();
+          await signIn(user, pass);
+        }
         await activateDevice();
       }
       await saveActivation();
@@ -985,14 +1022,12 @@ CrossPoint.registerPlugin(async (container, api) => {
       btn.textContent = 'Replace account';
       status('Activation saved. You can now fetch uploaded content below.');
     } catch (e) {
-      if (e.adeptRejected && activation) {
-        activation.phase = 'identity';
-        try { await saveActivation(); } catch (ignored) {}
-      }
       const saveOnly = activation?.session.act?.deviceUuid && sameAccount(activation.account, user);
       if (saveOnly) btn.textContent = 'Save activation';
+      else btn.textContent = activationPending() ? 'Retry activation' : session?.act?.deviceUuid ? 'Replace account' : 'Activate device';
       status('Error: ' + e.message + (saveOnly
-        ? '\nKeep this page open and retry Save activation; it will not register the device again.' : ''));
+        ? '\nKeep this page open and retry Save activation; it will not register the device again.'
+        : activationPending() ? '\n' + activationRecoveryMessage() : ''));
     } finally {
       document.getElementById('lib-pass').value = '';
       activating = false;

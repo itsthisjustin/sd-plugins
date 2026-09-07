@@ -73,7 +73,7 @@
       "title": "Protected Content",
       "description": "Fulfill protected content from an online provider.",
       "author": "Diirge",
-      "version": "1.0.3",
+      "version": "1.0.4",
       "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/protected-content/",
       "files": [
         "manifest.json",

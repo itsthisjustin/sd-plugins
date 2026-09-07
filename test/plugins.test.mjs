@@ -266,6 +266,7 @@ async function protectedContentFixture(options = {}) {
   const files = new Map();
   const relayCalls = [];
   const cryptoCalls = [];
+  const confirmations = [];
   let savedCredential = '';
   let randomCounter = 0;
   let activationRedirected = false;
@@ -396,7 +397,10 @@ async function protectedContentFixture(options = {}) {
       'lib-refresh', 'lib-fulfill', 'lib-status',
     ]);
     const { render } = await loadPlugin('protected-content/plugin.js', {
-      document, window: { location: { search: '?path=%2FLoans' } }, fetch,
+      document, window: {
+        location: { search: '?path=%2FLoans' },
+        confirm(message) { confirmations.push(message); return options.confirmRetry === true; },
+      }, fetch,
     });
     await render({ innerHTML: '' }, api);
     return document;
@@ -408,7 +412,7 @@ async function protectedContentFixture(options = {}) {
     await doc.elements['lib-go'].onclick();
   }
   return { document, loadPage, activate, api, fetch, files, writes, downloads, deletes, fulfillmentOperations,
-    relayCalls, cryptoCalls, credential: () => savedCredential,
+    relayCalls, cryptoCalls, confirmations, credential: () => savedCredential,
     activationCount: () => relayCalls.filter(({ url }) => url.endsWith('/Activate')).length };
 }
 
@@ -585,6 +589,135 @@ for (const activationFailure of ['lost reply', 'redirect']) {
     assert.match(page.elements['lib-status'].textContent, /no saved reply/);
   });
 }
+
+test('pending activation explains recovery on reload and cancellation leaves saved progress unchanged', async () => {
+  const f = await protectedContentFixture({ activationFailure: 'lost reply' });
+  await f.activate();
+  const saved = f.files.get(activationPath);
+  assert.equal(checkpoint(f).lastError, 'lost reply');
+  const page = await f.loadPage();
+  assert.equal(page.elements['lib-go'].textContent, 'Retry activation');
+  assert.equal(page.elements['lib-user'].value, 'reader@example.com');
+  assert.match(page.elements['lib-account-state'].textContent, /Last error: lost reply/);
+  await f.activate(page, 'reader@example.com', '');
+  assert.match(f.confirmations[0], /another activation slot/);
+  assert.equal(f.activationCount(), 1);
+  assert.equal(f.files.get(activationPath), saved);
+});
+
+test('confirmed retry sends one activation with the saved identity and keys, without signing in again', async () => {
+  const options = { activationFailure: 'lost reply' };
+  const f = await protectedContentFixture(options);
+  await f.activate();
+  const original = checkpoint(f).session;
+  const signIns = f.relayCalls.filter(({ url }) => url.endsWith('/SignInDirect')).length;
+  const keygens = f.cryptoCalls.filter(({ op }) => op === 'keygen').length;
+  options.activationFailure = null;
+  options.confirmRetry = true;
+  await f.activate(await f.loadPage(), 'reader@example.com', '');
+  assert.equal(f.confirmations.length, 1);
+  assert.equal(f.activationCount(), 2);
+  const recovered = checkpoint(f).session;
+  assert.deepEqual(recovered.device, original.device);
+  assert.equal(recovered.salt, original.salt);
+  assert.equal(recovered.act.signingKey, original.act.signingKey);
+  assert.equal(recovered.act.privateLicenseKey, original.act.privateLicenseKey);
+  assert.equal(f.relayCalls.filter(({ url }) => url.endsWith('/SignInDirect')).length, signIns);
+  assert.equal(f.cryptoCalls.filter(({ op }) => op === 'keygen').length, keygens);
+  assert.equal(checkpoint(f).lastError, undefined);
+  assert.match(f.credential(), /deviceUuid: urn:uuid:device/);
+  await f.activate(await f.loadPage(), 'reader@example.com', '');
+  assert.equal(f.activationCount(), 2);
+  assert.equal(f.confirmations.length, 1);
+});
+
+test('a failed recovery request requires fresh confirmation and cannot be duplicated concurrently', async () => {
+  const options = { activationFailure: 'lost reply', confirmRetry: true };
+  const f = await protectedContentFixture(options);
+  await f.activate();
+  const page = await f.loadPage();
+  let resume;
+  options.pauseCrypto = new Promise(resolve => { resume = resolve; });
+  const first = f.activate(page, 'reader@example.com', '');
+  const duplicate = f.activate(page, 'reader@example.com', '');
+  resume();
+  await Promise.all([first, duplicate]);
+  assert.equal(f.activationCount(), 2);
+  assert.equal(f.confirmations.length, 1);
+  options.confirmRetry = false;
+  await f.activate(page, 'reader@example.com', '');
+  assert.equal(f.activationCount(), 2);
+  assert.equal(f.confirmations.length, 2);
+});
+
+test('a failed recovery checkpoint write keeps the original attempt pending', async () => {
+  const options = { activationFailure: 'lost reply', confirmRetry: true };
+  const f = await protectedContentFixture(options);
+  await f.activate();
+  options.activationFailure = null;
+  options.failWrite = path => path === activationPath;
+  const page = await f.loadPage();
+  await f.activate(page, 'reader@example.com', '');
+  assert.equal(f.activationCount(), 1);
+  assert.equal(checkpoint(f).phase, 'requested');
+  options.failWrite = null;
+  options.confirmRetry = false;
+  await f.activate(page, 'reader@example.com', '');
+  assert.equal(f.activationCount(), 1);
+  assert.equal(f.confirmations.length, 2);
+});
+
+test('checkpoints from older versions remain recoverable when the original error is missing', async () => {
+  const options = { activationFailure: 'lost reply' };
+  const f = await protectedContentFixture(options);
+  await f.activate();
+  const old = checkpoint(f);
+  delete old.lastError;
+  f.files.set(activationPath, JSON.stringify(old));
+  const page = await f.loadPage();
+  assert.match(page.elements['lib-account-state'].textContent, /original error was not saved/);
+  options.activationFailure = null;
+  options.confirmRetry = true;
+  await f.activate(page, 'reader@example.com', '');
+  assert.equal(f.activationCount(), 2);
+  assert.match(f.credential(), /deviceUuid: urn:uuid:device/);
+});
+
+test('pending recovery cannot send its credentials for a different account', async () => {
+  const f = await protectedContentFixture({ activationFailure: 'lost reply', confirmRetry: true });
+  await f.activate();
+  const page = await f.loadPage();
+  await f.activate(page, 'other@example.com');
+  assert.equal(f.activationCount(), 1);
+  assert.equal(f.confirmations.length, 0);
+  assert.match(page.elements['lib-status'].textContent, /Retry that account first/);
+});
+
+test('a rejected recovery returns to ordinary activation and preserves the service error', async () => {
+  const options = { activationFailure: 'lost reply', confirmRetry: true };
+  const f = await protectedContentFixture(options);
+  await f.activate();
+  options.activationFailure = 'reject';
+  const page = await f.loadPage();
+  await f.activate(page, 'reader@example.com', '');
+  assert.equal(f.activationCount(), 2);
+  assert.equal(checkpoint(f).phase, 'identity');
+  assert.equal(checkpoint(f).lastError, 'E_ACT_TOO_MANY_ACTIVATIONS');
+  assert.equal(page.elements['lib-go'].textContent, 'Activate device');
+});
+
+test('pending recovery with missing signing credentials is blocked before confirmation or activation', async () => {
+  const f = await protectedContentFixture({ activationFailure: 'lost reply', confirmRetry: true });
+  await f.activate();
+  const damaged = checkpoint(f);
+  delete damaged.session.act.signingKey;
+  f.files.set(activationPath, JSON.stringify(damaged));
+  const page = await f.loadPage();
+  assert.match(page.elements['lib-account-state'].textContent, /Saved activation progress is damaged/);
+  await f.activate(page);
+  assert.equal(f.activationCount(), 1);
+  assert.equal(f.confirmations.length, 0);
+});
 
 test('explicit service rejection permits retry using the same identity', async () => {
   const options = { activationFailure: 'reject' };
