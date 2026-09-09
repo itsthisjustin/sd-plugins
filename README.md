@@ -74,6 +74,14 @@ Reconnect to the device web UI; the plugin's card appears on its page. A
   conversion). Enter server URL + API client + login in the web page; the
   reader signs in silently (OAuth2 password grant) and downloads articles.
   Works with self-hosted Wallabag or app.wallabag.it.
+- `month-wallpaper/` — a device plugin (`device.json` only): browse the months
+  offered by a hosted rendering server and download the chosen one straight
+  into the sleep-screen folder (`/sleep/calendar.bmp`). Points at a hosted
+  instance by default, so there's nothing to run. The server renders the
+  calendar to a 1-bit BMP — month/weekday names in the country's language,
+  weekend shading, adjacent-month days, and public holidays. Screen size,
+  country, and week start live in `/.crosspoint/month-wallpaper.json` and are
+  passed to the server per request.
 - `protected-content/` — a File Manager plugin that connects the reader to a
   protected-content provider, using the device relay + crypto. It detects an
   existing `/.crosspoint/content.key`, restores its fulfillment session, and lists

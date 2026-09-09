@@ -42,6 +42,19 @@
       ]
     },
     {
+      "name": "month-wallpaper",
+      "title": "Month Wallpaper",
+      "description": "Download a month-calendar sleep wallpaper from your Month Wallpaper server.",
+      "author": "marczykm",
+      "version": "1.0.0",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/month-wallpaper/",
+      "files": [
+        "manifest.json",
+        "device.json",
+        "README.md"
+      ]
+    },
+    {
       "name": "organize-by-author",
       "title": "Sort EPUBs by Author",
       "description": "Sort EPUBs in a folder into per-author subfolders.",

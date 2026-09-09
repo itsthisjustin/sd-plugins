@@ -1,0 +1,20 @@
+{
+  "title": "Month Wallpaper",
+  "config": { "file": "/.crosspoint/month-wallpaper.json" },
+  "browse": {
+    "format": "json",
+    "url": "https://crosspoint-calendar.marczyk.ovh/catalog?w={cfg.width}&h={cfg.height}&country={cfg.country}&week_start={cfg.week_start}&adjacent={cfg.show_adjacent}",
+    "method": "GET",
+    "items": "months",
+    "fields": { "title": "title", "url": "url" },
+    "page_size": 16
+  },
+  "download": {
+    "url": "{url}",
+    "dest_dir": "/sleep",
+    "filename": "calendar.bmp"
+  },
+  "description": "Download a month-calendar sleep wallpaper.",
+  "author": "marczykm",
+  "version": "1.0.0"
+}

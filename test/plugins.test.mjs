@@ -118,13 +118,38 @@ class TinyDomParser {
 }
 
 test('all plugin manifests satisfy the manifest contract', async () => {
-  const plugins = ['hello', 'organize-by-author', 'protected-content', 'dictionaries'];
+  const plugins = ['hello', 'organize-by-author', 'protected-content', 'dictionaries', 'month-wallpaper'];
   for (const plugin of plugins) {
     const manifest = JSON.parse(await readFile(new URL(plugin + '/manifest.json', root), 'utf8'));
     assert.equal(typeof manifest.title, 'string', plugin + ' needs a title');
     assert.ok(manifest.title.trim(), plugin + ' needs a non-empty title');
-    assert.ok(['files', 'settings'].includes(manifest.mount), plugin + ' has an invalid mount');
+    // mount is only meaningful for a plugin with a browser plugin.js; device-only
+    // plugins omit it. Validate it only when present.
+    if (manifest.mount !== undefined) {
+      assert.ok(['files', 'settings'].includes(manifest.mount), plugin + ' has an invalid mount');
+    }
   }
+});
+
+test('month-wallpaper device.json is a well-formed browse+download manifest', async () => {
+  const raw = await readFile(new URL('month-wallpaper/device.json', root), 'utf8');
+  assert.ok(Buffer.byteLength(raw, 'utf8') < 8192, 'device.json must stay under the 8 KB manifest cap');
+  const manifest = JSON.parse(raw);
+  assert.equal(manifest.title, 'Month Wallpaper');
+  assert.equal(manifest.config.file, '/.crosspoint/month-wallpaper.json');
+  // Browse the hosted server's catalog, shaped by the config file.
+  assert.equal(manifest.browse.format, 'json');
+  assert.match(manifest.browse.url, /^https:\/\/[^/]+\/catalog\?/);
+  assert.match(manifest.browse.url, /\bw=\{cfg\.width\}/);
+  assert.match(manifest.browse.url, /\bcountry=\{cfg\.country\}/);
+  assert.equal(manifest.browse.items, 'months');
+  assert.equal(manifest.browse.fields.title, 'title');
+  assert.equal(manifest.browse.fields.url, 'url');
+  assert.ok(manifest.browse.page_size <= 16, 'page_size cannot exceed the firmware max of 16');
+  // Download the selected month's BMP straight into the sleep folder.
+  assert.equal(manifest.download.url, '{url}');
+  assert.equal(manifest.download.dest_dir, '/sleep');
+  assert.equal(manifest.download.filename, 'calendar.bmp');
 });
 
 test('hello renders its settings card', async () => {
