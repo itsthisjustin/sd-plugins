@@ -1,0 +1,74 @@
+{
+  "title": "BookFusion",
+  "token": {
+    "file": "/.crosspoint/bookfusion.json",
+    "path": "token"
+  },
+  "browse": {
+    "url": "https://www.bookfusion.com/api/user/books/search",
+    "method": "POST",
+    "headers": {
+      "Authorization": "Bearer {token}",
+      "Accept": "application/json; api_version=10",
+      "Content-Type": "application/json"
+    },
+    "body": "{\"page\":{page},\"per_page\":{limit},\"sort\":\"added_at-desc\"}",
+    "items": "",
+    "fields": {
+      "title": "title",
+      "author": "authors.0.name",
+      "id": "id"
+    },
+    "page_size": 8,
+    "lists": [
+      { "title": "All Books" },
+      { "title": "Currently Reading", "body": "{\"page\":{page},\"per_page\":{limit},\"sort\":\"last_read_at-desc\",\"list\":\"currently_reading\"}" },
+      { "title": "Favorites", "body": "{\"page\":{page},\"per_page\":{limit},\"sort\":\"added_at-desc\",\"list\":\"favorites\"}" },
+      { "title": "Plan to Read", "body": "{\"page\":{page},\"per_page\":{limit},\"sort\":\"added_at-desc\",\"list\":\"planned_to_read\"}" },
+      { "title": "Completed", "body": "{\"page\":{page},\"per_page\":{limit},\"sort\":\"added_at-desc\",\"list\":\"completed\"}" }
+    ],
+    "search": {
+      "body": "{\"page\":{page},\"per_page\":{limit},\"query\":\"{query_raw}\"}"
+    }
+  },
+  "download": {
+    "url": "https://www.bookfusion.com/api/user/books/{id}/download",
+    "method": "POST",
+    "headers": {
+      "Authorization": "Bearer {token}",
+      "Accept": "application/json; api_version=10",
+      "Content-Type": "application/json"
+    },
+    "body": "{}",
+    "url_path": "url",
+    "dest_dir": "/BookFusion",
+    "filename": "{title}.epub",
+    "sidecar": {
+      "path": "{dest}.meta.json",
+      "body": "{\"bookfusion_id\":\"{id}\",\"source\":\"bookfusion\"}"
+    }
+  },
+  "auth": {
+    "request": {
+      "url": "https://www.bookfusion.com/api/user/auth/device",
+      "method": "POST",
+      "headers": {
+        "Accept": "application/json; api_version=10",
+        "Content-Type": "application/json"
+      },
+      "body": "{\"client_id\":\"koreader\"}"
+    },
+    "poll": {
+      "url": "https://www.bookfusion.com/api/user/auth/token",
+      "method": "POST",
+      "headers": {
+        "Accept": "application/json; api_version=10",
+        "Content-Type": "application/json"
+      },
+      "body": "{\"grant_type\":\"urn:ietf:params:oauth:grant-type:device_code\",\"client_id\":\"koreader\",\"device_code\":\"{device_code}\"}"
+    }
+  },
+  "description": "Browse and download your BookFusion library on the device.",
+  "author": "Diirge",
+  "version": "1.3.0"
+}

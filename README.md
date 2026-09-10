@@ -1,0 +1,208 @@
+# SD-card plugins
+
+Browser-side plugins the reader web UI loads from the SD card. Each is just
+JS + a manifest — **no firmware changes to add one.** The device discovers them,
+serves them, injects them into a page, and backs them with generic device
+capabilities (an outbound HTTP(S) relay, crypto primitives, SD read/write, and
+URL-to-SD download).
+
+A plugin can extend either the **File Manager** or the **Settings** page — its
+`manifest.json` `mount` decides which. That makes them useful for things like
+tidying a library (sort books into folders by author), batch-optimizing or
+renaming files, or connecting the reader to online services.
+
+## Install
+
+The easiest path: download
+[`plugin-store.zip`](https://github.com/itsthisjustin/sd-plugins/releases/download/plugin-store/plugin-store.zip)
+and unzip it at the **root of your SD card** — it installs the Plugin Store
+plugin, and every other plugin here can then be installed from the store
+itself (web UI → Settings → Plugin Store, or on the reader under Settings →
+System → Plugins).
+
+To install any plugin by hand instead, copy its folder to the SD card under
+any of these roots:
+
+```
+/.crosspoint/plugins/<name>/     or   /plugins/<name>/   or   /.plugins/<name>/
+    manifest.json     (optional)
+    plugin.js         (optional)
+    device.json       (optional)
+    ...any other assets
+```
+
+All three roots are scanned; `/plugins/` and `/.plugins/` at the card root are
+just easier to reach when copying from a computer. If the same plugin name
+exists in more than one root, the earlier one in the list above wins.
+
+Reconnect to the device web UI; the plugin's card appears on its page. A
+`device.json` also appears on the reader under Settings → System → Plugins.
+
+## Layout of this folder
+
+- `hello/` — minimal example; proves the loader end to end (no network).
+- `organize-by-author/` — a File Manager plugin: reads each EPUB in the current
+  folder and files it into a per-author subfolder. Uses only the same-origin
+  File Manager endpoints and the JSZip the page already loads — a good template
+  for "operate on the files I'm looking at" plugins. EPUB 2 and EPUB 3 creator
+  sort names are supported; reading progress, cache data, and visible
+  `.epub.rights` sidecars move with their book.
+- `bookfusion/` — a Settings plugin + `device.json` pair: sign in to
+  BookFusion from the web page or on the reader itself (device-code flow with
+  QR), then browse and download your library on-device under Settings >
+  System > Plugins. Writes each book's `<book>.meta.json` sidecar with its
+  BookFusion id, which rides KOSync progress uploads (enable "Send book
+  metadata" on the reader) so a sync server can forward progress
+  to BookFusion.
+- `webdav/` — a Settings plugin + `device.json` pair: enter a WebDAV server
+  URL and credentials in the web page (stored in `/.crosspoint/webdav.json`),
+  then browse folders and download books on the reader itself under Settings >
+  System > Plugins. Works with Nextcloud, ownCloud, Seafile, Koofr, and any
+  standard WebDAV share.
+- `plugin-store/` — install other plugins from one or more hosted catalogs; see [`CATALOG.md`](CATALOG.md) for the catalog spec.
+- `dictionaries/` — a Settings plugin + `device.json` pair: install offline
+  monolingual dictionaries (a word explained in its own language — for
+  looking up words in a book, not translating) for the reader's built-in
+  dictionary lookup. ~20 languages, generated from each language's own
+  Wiktionary edition plus Webster's 1913 for English by a scheduled mirror
+  workflow. Browse and download on the reader (Settings > System > Plugins)
+  or from the web page; files land as loose StarDict files in
+  `/dictionaries/<name>/`. The web page can also set the active dictionary
+  (`dictionaryName` in settings.json).
+- `wallabag/` — a Settings plugin + `device.json` pair: read your Wallabag
+  "read it later" articles on the device (Wallabag exports each as EPUB, so no
+  conversion). Enter server URL + API client + login in the web page; the
+  reader signs in silently (OAuth2 password grant) and downloads articles.
+  Works with self-hosted Wallabag or app.wallabag.it.
+## Development
+
+### Creating a plugin with Claude
+
+This repo ships a [Claude Code](https://claude.com/claude-code) skill that
+knows the whole plugin contract — the browser `api` object, the `device.json`
+schema, the firmware's hard limits (32 KB relay cap, 8 KB manifest cap, no
+redirect-follow on `/api/fetch`, no on-device archive extraction), store
+registration, and the test conventions. With Claude Code open in this repo,
+just describe the plugin you want:
+
+```
+> build a plugin that syncs reading progress to my Calibre server
+```
+
+Claude picks up the skill automatically (it lives in
+[`.claude/skills/create-plugin/`](.claude/skills/create-plugin/)) and will
+scaffold the folder, write `plugin.js`/`device.json` against the documented
+firmware behavior, register the plugin in `catalog.json`, and add tests. You
+can also invoke it explicitly with `/create-plugin`. The skill's
+[reference sheet](.claude/skills/create-plugin/reference.md) doubles as
+human-readable documentation of the device API and `device.json` schema —
+useful even without Claude.
+
+### Tests
+
+The examples have a dependency-free Node smoke suite:
+
+```sh
+npm test
+```
+
+It exercises plugin registration, author metadata parsing, unique download
+names, and file writes with mocked device APIs.
+
+## Security model
+
+Plugins are JavaScript loaded into the File Manager or Settings page, not an
+isolated iframe. They can call the same-origin web API and any generic device
+capabilities exposed by the host. Install only plugins whose source you trust,
+because network relay and download requests are unrestricted. Never put secrets
+in a plugin folder.
+
+## Contract
+
+**manifest.json** (optional):
+```json
+{
+  "title": "Sort EPUBs by author",   // card heading; defaults to the folder name
+  "mount": "files"                   // "files" (File Manager) or "settings"
+}
+```
+
+**plugin.js** registers a render function; the host calls it with a container and an api:
+```js
+CrossPoint.registerPlugin((container, api) => {
+  container.innerHTML = '<h2>My plugin</h2>...';
+  // api.name                              -> this plugin's name
+  // api.relay(method, url, headers, body) -> { status, body, headers }
+  //     device makes the HTTP(S) call (browsers can't, due to CORS);
+  //     request headers are an object; response headers are an ordered list of
+  //     [name, value] pairs with duplicates preserved (including every
+  //     Set-Cookie).
+  // api.crypto(op, fields)                -> wolfSSL primitive (base64 I/O)
+  // api.writeFile(path, dataB64)          -> write a small file to SD
+  // api.fetchToSd(url, dest, headers)     -> device downloads a URL to SD
+  // api.pluginFile(file)                  -> URL to another file in this plugin folder
+  // api.registerAction(name, fn)          -> expose an action external systems can
+  //     trigger through the device job queue (POST /api/plugin-jobs). fn(args)
+  //     runs in this page whenever it is open (including /plugins-run); return a
+  //     small result object, or throw to fail the job.
+});
+```
+
+A File Manager plugin can also just call the same-origin endpoints the page
+already uses (`/api/files`, `/mkdir`, `/move`, `/download`) — see
+`organize-by-author/` — so many plugins need nothing from the device api at all.
+
+## Firmware endpoints (generic, scheme-neutral)
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/plugins` | list discovered plugins (name/title/mount) |
+| `GET /plugin?name=&file=` | serve a file from a plugin folder |
+| `POST /api/relay` | device performs an outbound HTTP(S) call for a plugin (any method, incl. PROPFIND) |
+| `POST /api/crypto` | generic crypto primitive — hash, random, AES, RSA, PKCS#12 (base64 I/O) |
+| `POST /api/fetch` | device downloads a URL straight to SD |
+| `POST /api/plugin-fs` | plugin writes a small file to SD |
+| `POST /api/plugin-jobs` (+ `/claim`, `/complete`, `/status`) | job queue: external systems trigger registered plugin actions |
+| `GET /plugins-run` | headless page that executes queued jobs while open |
+
+## On-device screens (`device.json`)
+
+A plugin can also ship a `device.json` describing an on-device catalog screen
+(sign in via OAuth device-code, browse an authenticated JSON API, search it,
+download to SD, write per-book sidecars) that appears under **Settings >
+System > Plugins** on the reader itself, no phone needed once set up. The
+manifest is pure data; the firmware interprets it with one generic activity.
+Schema reference: `docs/sd-plugins.md` in the reader firmware repository.
+See `bookfusion/` for a complete example that ships both `plugin.js` (browser
+sign-in) and `device.json` (on-device sign-in + library browsing).
+
+### On-device search
+
+If the catalog's server can answer queries, add a `search` block under
+`browse` and the browsing screen gains a search action that opens the
+on-device keyboard:
+
+```json
+"browse": {
+  "url": "https://example.com/api/items?page={page}&perPage={limit}",
+  "search": {
+    "url": "https://example.com/api/search?term={query}&page={page}&perPage={limit}"
+  }
+}
+```
+
+- `{query}` is the typed text, URL-encoded (safe in a URL); `{query_raw}` is
+  the verbatim text, for POST-body templates.
+- `search.url` and `search.body` each fall back to the browse `url`/`body`
+  when unset — so an API that searches via a body field only needs
+  `search.body`.
+- Results are paged like any browse view (`{page}`/`{limit}` still apply),
+  span the whole catalog rather than the current list, and **Back** returns
+  to the pre-search view.
+- JSON catalogs only (XML browse navigates by folder instead), and the server
+  does the matching — a static file host can't answer `{query}`, which is why
+  the `dictionaries/` catalog doesn't use it.
+
+`bookfusion/` is the live example: its API searches via a body field, so its
+`device.json` sets only `search.body` (with `{query_raw}` inside the JSON
+string) and reuses the browse URL.

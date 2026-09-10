@@ -1,0 +1,112 @@
+{
+  "name": "SD Plugins",
+  "plugins": [
+    {
+      "name": "bookfusion",
+      "title": "BookFusion",
+      "description": "Browse and download your BookFusion library on the device.",
+      "author": "Diirge",
+      "version": "1.2.0",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/bookfusion/",
+      "files": [
+        "manifest.json",
+        "device.json",
+        "plugin.js",
+        "README.md"
+      ]
+    },
+    {
+      "name": "dictionaries",
+      "title": "Dictionaries",
+      "description": "Download offline dictionaries for the built-in dictionary lookup, and pick the active one.",
+      "author": "Diirge",
+      "version": "1.0.0",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/dictionaries/",
+      "files": [
+        "manifest.json",
+        "device.json",
+        "plugin.js",
+        "README.md"
+      ]
+    },
+    {
+      "name": "hello",
+      "title": "Hello Plugin",
+      "description": "Minimal example plugin.",
+      "author": "Diirge",
+      "version": "1.0.0",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/hello/",
+      "files": [
+        "manifest.json",
+        "plugin.js"
+      ]
+    },
+    {
+      "name": "organize-by-author",
+      "title": "Sort EPUBs by Author",
+      "description": "Sort EPUBs in a folder into per-author subfolders.",
+      "author": "Diirge",
+      "version": "1.0.0",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/organize-by-author/",
+      "files": [
+        "manifest.json",
+        "plugin.js",
+        "README.md"
+      ]
+    },
+    {
+      "name": "plugin-store",
+      "title": "Plugin Store",
+      "description": "Browse and install plugins from a hosted catalog.",
+      "author": "Diirge",
+      "version": "1.1.2",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/plugin-store/",
+      "files": [
+        "manifest.json",
+        "device.json",
+        "plugin.js",
+        "README.md"
+      ]
+    },
+    {
+      "name": "protected-content",
+      "title": "Protected Content",
+      "description": "Fulfill protected content from an online provider.",
+      "author": "Diirge",
+      "version": "1.0.4",
+      "base": "https://protected-content-host-production.up.railway.app/",
+      "files": [
+        "manifest.json",
+        "plugin.js"
+      ]
+    },
+    {
+      "name": "wallabag",
+      "title": "Wallabag",
+      "description": "Read your Wallabag saved articles on the device as EPUB.",
+      "author": "Diirge",
+      "version": "1.2.0",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/wallabag/",
+      "files": [
+        "manifest.json",
+        "device.json",
+        "plugin.js",
+        "README.md"
+      ]
+    },
+    {
+      "name": "webdav",
+      "title": "WebDAV",
+      "description": "Browse and download books from a WebDAV server (Nextcloud, Koofr, ...).",
+      "author": "Diirge",
+      "version": "1.0.0",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/webdav/",
+      "files": [
+        "manifest.json",
+        "device.json",
+        "plugin.js",
+        "README.md"
+      ]
+    }
+  ]
+}

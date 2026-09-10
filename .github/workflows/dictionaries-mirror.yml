@@ -1,0 +1,59 @@
+# Rebuild the monolingual dictionary mirror: generate StarDict files from each
+# language's Wiktionary edition (kaikki.org extracts) plus Webster's 1913,
+# upload them as assets on the rolling `dictionaries` release, and commit the
+# regenerated browse catalog.
+name: Dictionaries mirror
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 1 * *'  # monthly; Wiktionary extracts update continuously
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dictionaries-mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build dictionaries and catalog
+        env:
+          # The English Wiktionary extract holds >1M entries in memory while
+          # grouping headwords.
+          NODE_OPTIONS: --max-old-space-size=12288
+        run: node scripts/build-dictionaries.mjs --out dist
+
+      - name: Create or update the rolling release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view dictionaries --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create dictionaries --repo "$GITHUB_REPOSITORY" \
+              --title "Dictionary mirror" \
+              --notes "Monolingual StarDict dictionaries for the Dictionaries plugin, generated from each language's Wiktionary edition (via kaikki.org, CC BY-SA/GFDL) plus the public-domain Webster's 1913. Rebuilt monthly."
+
+      - name: Upload assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          find dist/assets -type f -print0 | \
+            xargs -0 -n 8 gh release upload dictionaries --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Commit regenerated catalog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dictionaries/catalog
+          if git diff --cached --quiet; then
+            echo "Catalog unchanged"
+          else
+            git commit -m "Regenerate dictionary catalog"
+            git push
+          fi
