@@ -82,7 +82,9 @@ function b64(str) {
       "toast": "Synced {event.book}"
     }
     // events: reader.open, reader.exit, book.downloaded, sleep.enter.
-    // Handler = "request" or "download" (+ optional "toast", "connect").
+    // Handler = "request" or "download" (+ optional "toast").
+    // sleep.enter is delivered at sleep entry (WiFi brought up if needed);
+    // failures stay queued and retry on the next drain (at-least-once).
     // Extra variables: {event.NAME}, {event.ts}, {meta.KEY} (book sidecar).
     // Full semantics + limits: firmware docs/plugin-events.md.
   }
