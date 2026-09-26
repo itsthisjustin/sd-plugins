@@ -1,0 +1,7 @@
+{
+  "title": "Pomodoro Timer",
+  "mount": "settings",
+  "description": "Simple Pomodoro focus timer with work/break intervals, right on the device.",
+  "author": "mara1995",
+  "version": "1.0.0"
+}
