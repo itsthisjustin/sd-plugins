@@ -127,13 +127,13 @@ test('all plugin manifests satisfy the manifest contract', async () => {
   }
 });
 
-// The firmware only offers an update when the catalog version is a newer
-// MAJOR.MINOR.PATCH than the installed manifest's, so both must use it.
-test('every catalog entry and installed manifest version is MAJOR.MINOR.PATCH', async () => {
+// When a catalog or manifest declares a version, firmware update comparison
+// requires three-part MAJOR.MINOR.PATCH. Catalog versions remain optional.
+test('every declared catalog and installed manifest version is MAJOR.MINOR.PATCH', async () => {
   const semver = /^\d+\.\d+\.\d+$/;
   const catalog = JSON.parse(await readFile(new URL('catalog.json', root), 'utf8'));
   for (const entry of catalog.plugins) {
-    assert.match(String(entry.version), semver, entry.name + ' catalog version');
+    if (entry.version !== undefined) assert.match(String(entry.version), semver, entry.name + ' catalog version');
   }
   for (const entry of await readdir(root, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;

@@ -98,8 +98,7 @@
       "title": "Plugin Hub",
       "description": "Discover, install, and update CrossPoint community plugins.",
       "author": "Jadehawk",
-      "version": "0.1.2",
-      "base": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/v0.1.2/",
+      "base": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/stable/",
       "files": [
         "manifest.json",
         "device.json",
